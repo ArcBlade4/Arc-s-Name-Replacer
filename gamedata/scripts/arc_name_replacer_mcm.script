@@ -4,7 +4,6 @@ local last_check_time = 0 -- time since last check
 local spawn_chance = 1
 local enable_messages = false
 local file_found = false
-local is_enabled = true
 
 -- patterns that count as a "generic" npc, safe to rename
 local generic_patterns = {
@@ -152,7 +151,6 @@ end
 
 -- scan for NPCS
 function execute_scanner_loop()
-    if not is_enabled then return end
 
     local current_time = time_global()
 
