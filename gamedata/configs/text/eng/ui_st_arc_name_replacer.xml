@@ -1,0 +1,25 @@
+<string_table>
+    <!-- Menu Title in MCM Sidebar -->
+    <string id="ui_mcm_menu_arc_name_replacer">
+        <text>Arc's Stalker Name Replacer</text>
+    </string>
+    <string id="ui_mcm_arc_name_replacer_title">
+        <text>Settings</text>
+    </string>
+    
+    <!-- Slider Labels -->
+    <string id="ui_mcm_arc_name_replacer_spawn_chance">
+        <text>Spawn Chance (%)</text>
+    </string>
+    <string id="ui_mcm_arc_name_replacer_spawn_chance_desc">
+        <text>Percentage probability that a special name will appear.</text>
+    </string>
+    
+    <!-- Checkbox Labels -->
+    <string id="ui_mcm_arc_name_replacer_enable_messages">
+        <text>Enable PDA Alerts</text>
+    </string>
+    <string id="ui_mcm_arc_name_replacer_enable_messages_desc">
+        <text>Toggle to turn on/off PDA notifications.</text>
+    </string>
+</string_table>

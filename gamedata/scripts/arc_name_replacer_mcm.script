@@ -1,0 +1,182 @@
+local donator_pool = {} -- list for donor names
+local processed_npcs = {} -- ids of npcs who have been processed
+local last_check_time = 0 -- time since last check
+local spawn_chance = 1
+local enable_messages = false
+local file_found = false
+local is_enabled = true
+
+-- patterns that count as a "generic" npc, safe to rename
+local generic_patterns = {
+    "default", "regular", "tier", "squad",
+    "sim_npc", "alpha", "weak", "normal", "strong"
+}
+
+-- special messages for specific donor names
+local special_messages = {
+    ["ArcBlade"]   = "%c[255,72,155,232]Arc: %c[default]\\nKnock knock, guess who?", -- special message when its me
+    ["BlackSpero"] = "%c[255,72,155,232]Arc: %c[default]\\nYo, there's a renegade in disguise nearby...", -- special message for BlackSpero
+    ["Crocnballs"] = "%c[255,72,155,232]Arc: %c[default]\\nHold up, a croc has dangled into the zone...", -- special message for Crocnballs
+}
+
+-- regular confirmation messages, one gets picked at random
+local generic_messages = {
+    "%c[255,72,155,232]Arc: %c[default]\\nHeads up, someone special's lurking....",
+    "%c[255,72,155,232]Arc: %c[default]\\nSomeone special's out there now, exploring the zone...",
+    "%c[255,72,155,232]Arc: %c[default]\\nLooks like a familiar face's nearby...",
+}
+
+-- Load names from names.txt
+local function load_names()
+    local engine_root_path = getFS():update_path("$fs_root$", "") -- get game root
+    local file_path = engine_root_path .. "names.txt" -- find names file
+    local file = io.open(file_path, "r") -- read names file
+
+    if file then -- check if file exists
+        printf("VNM: Found names.txt, loading names...")
+        for line in file:lines() do -- read all lines
+            local clean_name = line:gsub("^%s*(.-)%s*$", "%1") -- clean line of whitespace
+            if clean_name ~= "" then
+                table.insert(donator_pool, clean_name) -- add to names list
+            end
+        end
+        file:close()
+        printf("VNM: Successfully loaded " .. #donator_pool .. " names from text file.")
+        file_found = true
+    else -- error message for if file not found
+        printf("VNM: WARNING! names.txt not found. looked here: " .. tostring(file_path))
+    end
+end
+
+-- mcm stuff
+function on_mcm_load()
+    op = {
+        id = "arc_name_replacer",
+        sh = true,
+        gr = {
+            -- Title text banner mapping
+            { id = "title", type = "slide", link = "ui_options_slider_player", text = "ui_mcm_arc_name_replacer_title", size = {512, 50}, spacing = 20 },
+
+            -- Spawn Chance Slider (0% to 100%)
+            { id = "spawn_chance", type = "track", val = 2, def = 1, min = 0, max = 100, step = 0.5 },
+
+            -- PDA Notification Checkbox Toggle
+            { id = "enable_messages", type = "check", val = 1, def = true }
+        }
+    }
+    return op
+end
+
+-- load mcm settings
+function load_settings()
+    if ui_mcm then
+        spawn_chance = ui_mcm.get("arc_name_replacer/spawn_chance")
+        enable_messages = ui_mcm.get("arc_name_replacer/enable_messages")
+    end
+end
+
+-- saves
+local function save_state(m_data)
+    m_data.vnm_donator_pool = donator_pool
+    m_data.vnm_processed_npcs = processed_npcs
+    m_data.vnm_names_loaded = file_found
+end
+
+local function load_state(m_data)
+    donator_pool = m_data.vnm_donator_pool or donator_pool
+    processed_npcs = m_data.vnm_processed_npcs or processed_npcs
+    file_found = m_data.vnm_names_loaded or file_found
+end
+
+-- makes name load once
+local function ensure_names_loaded()
+    if not file_found then
+        load_names()
+    end
+end
+
+-- checks profile name against the generic patterns list
+local function is_generic_profile(profile)
+    for _, pattern in ipairs(generic_patterns) do -- loop through patterns instead of one big if/or
+        if string.find(profile, pattern) then
+            return true
+        end
+    end
+    return false
+end
+
+-- grabs a random name from the pool and removes it
+local function take_random_name()
+    local idx = math.random(#donator_pool) -- pick random index
+    local chosen_name = donator_pool[idx] -- get name at that index
+    table.remove(donator_pool, idx) -- remove it so it can't be reused
+    return chosen_name
+end
+
+-- sends the pda tip for whatever name got picked
+local function notify_rename(chosen_name)
+    if not enable_messages then return end -- notifications off via mcm, skip
+
+    local text = special_messages[chosen_name] -- check for a special message first
+    if not text then
+        text = generic_messages[math.random(1, #generic_messages)] -- otherwise grab a random generic one
+    end
+
+    news_manager.send_tip(db.actor, text, nil, "default", 5000)
+end
+
+-- does the actual rename roll + rename for one npc
+local function try_rename_npc(npc)
+    local profile = npc:profile_name() or "" -- open npc profile
+
+    -- check if npc is important
+    if not is_generic_profile(profile) then
+        printf("VNM: Protected Unique NPC found (" .. profile .. "). Skipping donator rename roll.")
+        return
+    end
+
+    if not (file_found and #donator_pool ~= 0) then return end -- no names loaded/left, skip
+
+    local roll = math.random() * 100
+    if roll > spawn_chance then return end -- failed the roll, skip
+
+    local chosen_name = take_random_name() -- choose name
+
+    -- change npc name
+    local sim = alife()
+    local se = sim:object(npc:id())
+    se:set_character_name(chosen_name)
+
+    notify_rename(chosen_name)
+end
+
+-- scan for NPCS
+function execute_scanner_loop()
+    if not is_enabled then return end
+
+    local current_time = time_global()
+
+    if (current_time < last_check_time + 2000) then return end
+    last_check_time = current_time
+
+    -- check all ids
+    for id = 1, 65534 do
+        if not processed_npcs[id] then -- skip ones we've already handled
+            local npc = level.object_by_id(id) -- grab the actual npc object
+            -- check if npc is a stalker and is alive
+            if npc and IsStalker(npc) and npc:alive() then
+                processed_npcs[id] = true
+                try_rename_npc(npc)
+            end
+        end
+    end
+end
+
+-- initialisation
+function on_game_start()
+    RegisterScriptCallback("actor_on_update", execute_scanner_loop)
+    RegisterScriptCallback("save_state", save_state)
+    RegisterScriptCallback("load_state", load_state)
+    load_settings()
+    ensure_names_loaded()
+end
