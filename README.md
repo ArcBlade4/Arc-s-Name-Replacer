@@ -2,6 +2,7 @@
 Arc' Name Replacer Version: 1.3
 
 Mod Description:
+
 This mod randomly selects non unique stalkers to give a special name taken from the names.txt file.
 
 Installation: 
@@ -17,7 +18,9 @@ Manual:
 
 
 MCM settings:
+
 Spawn Chance (float 0-100)(default: 1) - Percentage chance for a stalker to be renamed.
+
 Enable PDA Alerts (bool)(default: true) - Turn on/off PDA alerts for when a stalker is renamed.
 
 Changelog:
