@@ -1,9 +1,12 @@
 local donator_pool = {} -- list for donor names
 local processed_npcs = {} -- ids of npcs who have been processed
+local renamed_npcs = {} -- id -> chosen_name, for every npc that got a donator name
 local last_check_time = 0 -- time since last check
 local spawn_chance = 1
 local enable_messages = false
 local file_found = false
+local is_enabled = true
+local enable_death_messages = false
 
 -- patterns that count as a "generic" npc, safe to rename
 local generic_patterns = {
@@ -23,6 +26,20 @@ local generic_messages = {
     "%c[255,72,155,232]Arc: %c[default]\\nHeads up, someone special's lurking....",
     "%c[255,72,155,232]Arc: %c[default]\\nSomeone special's out there now, exploring the zone...",
     "%c[255,72,155,232]Arc: %c[default]\\nLooks like a familiar face's nearby...",
+}
+
+-- messages sent when the player kills one of the special named npcs, overrides the generic ones below
+local special_kill_messages = {
+    ["ArcBlade"]   = "%c[255,72,155,232]Arc: %c[default]\\nOw, you got me... nice shot.", -- killed me
+    ["BlackSpero"] = "%c[255,72,155,232]Arc: %c[default]\\nRenegade down. One less traitor in the zone.", -- killed BlackSpero
+    ["Crocnballs"] = "%c[255,72,155,232]Arc: %c[default]\\nThe croc didn't make it...", -- killed Crocnballs
+}
+
+-- fallback kill messages for any renamed npc, name gets stuck on the end
+local generic_kill_messages = {
+    "%c[255,72,155,232]Arc: %c[default]\\nHeartless, you killed ",
+    "%c[255,72,155,232]Arc: %c[default]\\nWell, that's the end of ",
+    "%c[255,72,155,232]Arc: %c[default]\\nRest easy, ",
 }
 
 -- Load names from names.txt
@@ -47,7 +64,7 @@ local function load_names()
     end
 end
 
--- mcm stuff
+--mcm stuff
 function on_mcm_load()
     op = {
         id = "arc_name_replacer",
@@ -60,30 +77,35 @@ function on_mcm_load()
             { id = "spawn_chance", type = "track", val = 2, def = 1, min = 0, max = 100, step = 0.5 },
 
             -- PDA Notification Checkbox Toggle
-            { id = "enable_messages", type = "check", val = 1, def = true }
+            { id = "enable_messages", type = "check", val = 1, def = true },
+
+            -- Death Notification Checkbox Toggle
+            { id = "enable_death_messages", type = "check", val = 1, def = true }
         }
     }
     return op
 end
-
 -- load mcm settings
 function load_settings()
     if ui_mcm then
         spawn_chance = ui_mcm.get("arc_name_replacer/spawn_chance")
         enable_messages = ui_mcm.get("arc_name_replacer/enable_messages")
+        enable_death_messages = ui_mcm.get("arc_name_replacer/enable_death_messages") -- was missing, checkbox did nothing without this
     end
 end
 
--- saves
+-- Saves
 local function save_state(m_data)
     m_data.vnm_donator_pool = donator_pool
     m_data.vnm_processed_npcs = processed_npcs
+    m_data.vnm_renamed_npcs = renamed_npcs
     m_data.vnm_names_loaded = file_found
 end
 
 local function load_state(m_data)
     donator_pool = m_data.vnm_donator_pool or donator_pool
     processed_npcs = m_data.vnm_processed_npcs or processed_npcs
+    renamed_npcs = m_data.vnm_renamed_npcs or renamed_npcs
     file_found = m_data.vnm_names_loaded or file_found
 end
 
@@ -104,7 +126,7 @@ local function is_generic_profile(profile)
     return false
 end
 
--- grabs a random name from the pool and removes it
+-- grabs a random name from the pool and removes it, no second loop needed
 local function take_random_name()
     local idx = math.random(#donator_pool) -- pick random index
     local chosen_name = donator_pool[idx] -- get name at that index
@@ -146,11 +168,36 @@ local function try_rename_npc(npc)
     local se = sim:object(npc:id())
     se:set_character_name(chosen_name)
 
+    renamed_npcs[npc:id()] = chosen_name -- remember this one so we can catch its death later
+
     notify_rename(chosen_name)
 end
 
--- scan for NPCS
+-- fires when any npc dies, checks if it was one of ours and if the actor did it
+local function on_npc_killed(victim, who)
+    if not victim then return end -- who can be nil, e.g. killed by an anomaly, victim always exists
+
+    local chosen_name = renamed_npcs[victim:id()]
+    if not chosen_name then return end -- not a renamed npc, nothing to do
+
+    renamed_npcs[victim:id()] = nil -- clear it out either way, it's dead now
+
+    if not enable_death_messages then return end -- notifications off via mcm, skip
+
+    if not (who and who:id() == 0) then return end -- actor always has id 0, anything else isn't a player kill
+
+    -- special names get their own line, everyone else gets a generic one with their name tacked on
+    local text = special_kill_messages[chosen_name]
+    if not text then
+        text = generic_kill_messages[math.random(1, #generic_kill_messages)] .. chosen_name .. "..."
+    end
+
+    news_manager.send_tip(db.actor, text, nil, "default", 5000)
+end
+
+-- Scan for NPCS
 function execute_scanner_loop()
+    if not is_enabled then return end
 
     local current_time = time_global()
 
@@ -170,9 +217,10 @@ function execute_scanner_loop()
     end
 end
 
--- initialisation
+-- Initialisation
 function on_game_start()
     RegisterScriptCallback("actor_on_update", execute_scanner_loop)
+    RegisterScriptCallback("npc_on_death_callback", on_npc_killed)
     RegisterScriptCallback("save_state", save_state)
     RegisterScriptCallback("load_state", load_state)
     load_settings()
