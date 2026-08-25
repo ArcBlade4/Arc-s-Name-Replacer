@@ -22,4 +22,10 @@
     <string id="ui_mcm_arc_name_replacer_enable_messages_desc">
         <text>Toggle to turn on/off PDA notifications.</text>
     </string>
+    <string id="ui_mcm_arc_name_replacer_enable_death_messages">
+        <text>Enable Death Alerts</text>
+    </string>
+    <string id="ui_mcm_arc_name_replacer_enable_messages_desc">
+        <text>Toggle to turn on/off notifications whe you kill a renamed stalker.</text>
+    </string>
 </string_table>
