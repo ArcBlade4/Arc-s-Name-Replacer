@@ -28,9 +28,9 @@ Enable PDA Alerts (bool)(default: true) - Turn on/off PDA alerts for when a stal
 
 v1.4: Added death alerts when the player kills a renamed npc
 
-v1.2: Added some more PDA alerts
+v1.3: Made the mod more efficient
 
-v1.3: Made the mod more efficient 
+v1.2: Added some more PDA alerts 
 
 v1.1: Added saving so that a name can only appear once in a save file
 
