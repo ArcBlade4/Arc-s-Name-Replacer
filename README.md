@@ -26,6 +26,8 @@ Enable PDA Alerts (bool)(default: true) - Turn on/off PDA alerts for when a stal
 
 ## Changelog:
 
+v1.5: Fixed issue where npc could be renamed when joining/leaving squad
+
 v1.4: Added death alerts when the player kills a renamed npc
 
 v1.3: Made the mod more efficient
