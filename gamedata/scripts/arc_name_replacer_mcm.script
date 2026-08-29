@@ -16,7 +16,7 @@ local generic_patterns = {
 
 -- special messages for specific donor names
 local special_messages = {
-    ["ArcBlade"]   = "%c[255,72,155,232]Arc: %c[default]\\nKnock knock, guess who?", -- special message when its me
+    ["Arc Blade"]   = "%c[255,72,155,232]Arc: %c[default]\\nKnock knock, guess who?", -- special message when its me
     ["BlackSpero"] = "%c[255,72,155,232]Arc: %c[default]\\nYo, there's a renegade in disguise nearby...", -- special message for BlackSpero
     ["Crocnballs"] = "%c[255,72,155,232]Arc: %c[default]\\nHold up, a croc has dangled into the zone...", -- special message for Crocnballs
 }
@@ -30,7 +30,7 @@ local generic_messages = {
 
 -- messages sent when the player kills one of the special named npcs, overrides the generic ones below
 local special_kill_messages = {
-    ["ArcBlade"]   = "%c[255,72,155,232]Arc: %c[default]\\nOw, you got me... nice shot.", -- killed me
+    ["Arc Blade"]   = "%c[255,72,155,232]Arc: %c[default]\\nOw, you got me... nice shot.", -- killed me
     ["BlackSpero"] = "%c[255,72,155,232]Arc: %c[default]\\nRenegade down. One less traitor in the zone.", -- killed BlackSpero
     ["Crocnballs"] = "%c[255,72,155,232]Arc: %c[default]\\nThe croc didn't make it...", -- killed Crocnballs
 }
@@ -210,9 +210,12 @@ function execute_scanner_loop()
             local npc = level.object_by_id(id) -- grab the actual npc object
             -- check if npc is a stalker and is alive
             if npc and IsStalker(npc) and npc:alive() then
-                processed_npcs[id] = true
-                try_rename_npc(npc)
-            end
+				local npc_name = npc:name()
+				if not processed_npcs[npc_name] then -- skip ones we've already handled
+					processed_npcs[npc_name] = true
+					try_rename_npc(npc)
+				end
+			end
         end
     end
 end
