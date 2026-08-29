@@ -1,5 +1,5 @@
 # Arc's Name Replacer
-Arc' Name Replacer Version: 1.4
+Arc' Name Replacer Version: 1.5
 
 ## Mod Description: 
 
