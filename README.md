@@ -23,6 +23,8 @@ Spawn Chance (float 0-100)(default: 1) - Percentage chance for a stalker to be r
 
 Enable PDA Alerts (bool)(default: true) - Turn on/off PDA alerts for when a stalker is renamed.
 
+Enable Death Alerts (bool)(default: true) - Toggle to turn on/off notifications when you kill a renamed stalker.
+
 
 ## Changelog:
 
