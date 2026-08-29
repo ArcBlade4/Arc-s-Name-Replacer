@@ -1,12 +1,56 @@
-local donator_pool = {} -- list for donor names
-local processed_npcs = {} -- ids of npcs who have been processed
-local renamed_npcs = {} -- id -> chosen_name, for every npc that got a donator name
-local last_check_time = 0 -- time since last check
+local donator_pool = {} 
+local processed_npcs = {}
+local renamed_npcs = {}
+local last_check_time = 0
 local spawn_chance = 1
 local enable_messages = false
 local file_found = false
 local is_enabled = true
 local enable_death_messages = false
+
+--[[
+    ========================
+    MESSAGES AND SPECIAL NAMES
+    ========================
+]]--
+
+-- special messages
+-- edit this to add special messages on rename
+local special_messages = {
+    ["Arc Blade"]   = "%c[255,72,155,232]Arc: %c[default]\\nKnock knock, guess who?",
+    ["BlackSpero"] = "%c[255,72,155,232]Arc: %c[default]\\nYo, there's a renegade in disguise nearby...",
+    ["Crocnballs"] = "%c[255,72,155,232]Arc: %c[default]\\nHold up, a croc has dangled into the zone...",
+}
+
+-- regular confirmation messages
+local generic_messages = {
+    "%c[255,72,155,232]Arc: %c[default]\\nHeads up, someone special's lurking....",
+    "%c[255,72,155,232]Arc: %c[default]\\nSomeone special's out there now, exploring the zone...",
+    "%c[255,72,155,232]Arc: %c[default]\\nLooks like a familiar face's nearby...",
+}
+
+-- special kill mesages
+-- edit this to add special messages on kill
+local special_kill_messages = {
+    ["Arc Blade"]   = "%c[255,72,155,232]Arc: %c[default]\\nOw, you got me... nice shot.",
+    ["BlackSpero"] = "%c[255,72,155,232]Arc: %c[default]\\nRenegade down. One less traitor in the zone.",
+    ["Crocnballs"] = "%c[255,72,155,232]Arc: %c[default]\\nThe croc didn't make it...", 
+}
+
+-- regular kill messages
+local generic_kill_messages = {
+    "%c[255,72,155,232]Arc: %c[default]\\nHeartless, you killed ",
+    "%c[255,72,155,232]Arc: %c[default]\\nWell, that's the end of ",
+    "%c[255,72,155,232]Arc: %c[default]\\nRest easy, ",
+}
+
+--[[
+    ========================
+    CODE (DO NOT EDIT)
+    ========================
+]]--
+
+
 
 -- patterns that count as a "generic" npc, safe to rename
 local generic_patterns = {
@@ -14,46 +58,20 @@ local generic_patterns = {
     "sim_npc", "alpha", "weak", "normal", "strong"
 }
 
--- special messages for specific donor names
-local special_messages = {
-    ["Arc Blade"]   = "%c[255,72,155,232]Arc: %c[default]\\nKnock knock, guess who?", -- special message when its me
-    ["BlackSpero"] = "%c[255,72,155,232]Arc: %c[default]\\nYo, there's a renegade in disguise nearby...", -- special message for BlackSpero
-    ["Crocnballs"] = "%c[255,72,155,232]Arc: %c[default]\\nHold up, a croc has dangled into the zone...", -- special message for Crocnballs
-}
 
--- regular confirmation messages, one gets picked at random
-local generic_messages = {
-    "%c[255,72,155,232]Arc: %c[default]\\nHeads up, someone special's lurking....",
-    "%c[255,72,155,232]Arc: %c[default]\\nSomeone special's out there now, exploring the zone...",
-    "%c[255,72,155,232]Arc: %c[default]\\nLooks like a familiar face's nearby...",
-}
 
--- messages sent when the player kills one of the special named npcs, overrides the generic ones below
-local special_kill_messages = {
-    ["Arc Blade"]   = "%c[255,72,155,232]Arc: %c[default]\\nOw, you got me... nice shot.", -- killed me
-    ["BlackSpero"] = "%c[255,72,155,232]Arc: %c[default]\\nRenegade down. One less traitor in the zone.", -- killed BlackSpero
-    ["Crocnballs"] = "%c[255,72,155,232]Arc: %c[default]\\nThe croc didn't make it...", -- killed Crocnballs
-}
-
--- fallback kill messages for any renamed npc, name gets stuck on the end
-local generic_kill_messages = {
-    "%c[255,72,155,232]Arc: %c[default]\\nHeartless, you killed ",
-    "%c[255,72,155,232]Arc: %c[default]\\nWell, that's the end of ",
-    "%c[255,72,155,232]Arc: %c[default]\\nRest easy, ",
-}
-
--- Load names from names.txt
+-- load names
 local function load_names()
-    local engine_root_path = getFS():update_path("$fs_root$", "") -- get game root
-    local file_path = engine_root_path .. "names.txt" -- find names file
-    local file = io.open(file_path, "r") -- read names file
+    local engine_root_path = getFS():update_path("$fs_root$", "")
+    local file_path = engine_root_path .. "names.txt"
+    local file = io.open(file_path, "r")
 
     if file then -- check if file exists
         printf("VNM: Found names.txt, loading names...")
         for line in file:lines() do -- read all lines
-            local clean_name = line:gsub("^%s*(.-)%s*$", "%1") -- clean line of whitespace
+            local clean_name = line:gsub("^%s*(.-)%s*$", "%1")
             if clean_name ~= "" then
-                table.insert(donator_pool, clean_name) -- add to names list
+                table.insert(donator_pool, clean_name)
             end
         end
         file:close()
@@ -85,6 +103,7 @@ function on_mcm_load()
     }
     return op
 end
+
 -- load mcm settings
 function load_settings()
     if ui_mcm then
@@ -94,7 +113,7 @@ function load_settings()
     end
 end
 
--- Saves
+-- saving stuff
 local function save_state(m_data)
     m_data.vnm_donator_pool = donator_pool
     m_data.vnm_processed_npcs = processed_npcs
@@ -118,7 +137,7 @@ end
 
 -- checks profile name against the generic patterns list
 local function is_generic_profile(profile)
-    for _, pattern in ipairs(generic_patterns) do -- loop through patterns instead of one big if/or
+    for _, pattern in ipairs(generic_patterns) do
         if string.find(profile, pattern) then
             return true
         end
@@ -126,7 +145,7 @@ local function is_generic_profile(profile)
     return false
 end
 
--- grabs a random name from the pool and removes it, no second loop needed
+-- grabs a random name from the pool and removes it
 local function take_random_name()
     local idx = math.random(#donator_pool) -- pick random index
     local chosen_name = donator_pool[idx] -- get name at that index
@@ -134,13 +153,13 @@ local function take_random_name()
     return chosen_name
 end
 
--- sends the pda tip for whatever name got picked
+-- sends the pda alert
 local function notify_rename(chosen_name)
-    if not enable_messages then return end -- notifications off via mcm, skip
+    if not enable_messages then return end
 
-    local text = special_messages[chosen_name] -- check for a special message first
-    if not text then
-        text = generic_messages[math.random(1, #generic_messages)] -- otherwise grab a random generic one
+		local text = special_messages[chosen_name]
+        text = generic_messages[math.random(1, #generic_messages)]
+		
     end
 
     news_manager.send_tip(db.actor, text, nil, "default", 5000)
@@ -156,37 +175,36 @@ local function try_rename_npc(npc)
         return
     end
 
-    if not (file_found and #donator_pool ~= 0) then return end -- no names loaded/left, skip
+    if not (file_found and #donator_pool ~= 0) then return end
 
     local roll = math.random() * 100
-    if roll > spawn_chance then return end -- failed the roll, skip
+    if roll > spawn_chance then return end
 
-    local chosen_name = take_random_name() -- choose name
+    local chosen_name = take_random_name()
 
     -- change npc name
     local sim = alife()
     local se = sim:object(npc:id())
     se:set_character_name(chosen_name)
 
-    renamed_npcs[npc:id()] = chosen_name -- remember this one so we can catch its death later
+    renamed_npcs[npc:name()] = chosen_name
 
     notify_rename(chosen_name)
 end
 
--- fires when any npc dies, checks if it was one of ours and if the actor did it
+-- kill check
 local function on_npc_killed(victim, who)
-    if not victim then return end -- who can be nil, e.g. killed by an anomaly, victim always exists
+    if not victim then return end
 
-    local chosen_name = renamed_npcs[victim:id()]
-    if not chosen_name then return end -- not a renamed npc, nothing to do
+    local chosen_name = renamed_npcs[victim:name()]
+    if not chosen_name then return end
 
-    renamed_npcs[victim:id()] = nil -- clear it out either way, it's dead now
+    renamed_npcs[victim:name()] = nil
 
-    if not enable_death_messages then return end -- notifications off via mcm, skip
+    if not enable_death_messages then return end
 
-    if not (who and who:id() == 0) then return end -- actor always has id 0, anything else isn't a player kill
+    if not (who and who:id() == 0) then return end 
 
-    -- special names get their own line, everyone else gets a generic one with their name tacked on
     local text = special_kill_messages[chosen_name]
     if not text then
         text = generic_kill_messages[math.random(1, #generic_kill_messages)] .. chosen_name .. "..."
@@ -195,7 +213,7 @@ local function on_npc_killed(victim, who)
     news_manager.send_tip(db.actor, text, nil, "default", 5000)
 end
 
--- Scan for NPCS
+-- npc scanner
 function execute_scanner_loop()
     if not is_enabled then return end
 
@@ -206,12 +224,12 @@ function execute_scanner_loop()
 
     -- check all ids
     for id = 1, 65534 do
-        if not processed_npcs[id] then -- skip ones we've already handled
-            local npc = level.object_by_id(id) -- grab the actual npc object
+        if not processed_npcs[id] then
+            local npc = level.object_by_id(id) 
             -- check if npc is a stalker and is alive
             if npc and IsStalker(npc) and npc:alive() then
 				local npc_name = npc:name()
-				if not processed_npcs[npc_name] then -- skip ones we've already handled
+				if not processed_npcs[npc_name] then
 					processed_npcs[npc_name] = true
 					try_rename_npc(npc)
 				end
