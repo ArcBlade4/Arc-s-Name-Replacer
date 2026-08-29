@@ -17,7 +17,7 @@ local enable_death_messages = false
 -- special messages
 -- edit this to add special messages on rename
 local special_messages = {
-    ["Arc Blade"]   = "%c[255,72,155,232]Arc: %c[default]\\nKnock knock, guess who?",
+    ["Arc Blade"]  = "%c[255,72,155,232]Arc: %c[default]\\nKnock knock, guess who?",
     ["BlackSpero"] = "%c[255,72,155,232]Arc: %c[default]\\nYo, there's a renegade in disguise nearby...",
     ["Crocnballs"] = "%c[255,72,155,232]Arc: %c[default]\\nHold up, a croc has dangled into the zone...",
 }
@@ -32,7 +32,7 @@ local generic_messages = {
 -- special kill mesages
 -- edit this to add special messages on kill
 local special_kill_messages = {
-    ["Arc Blade"]   = "%c[255,72,155,232]Arc: %c[default]\\nOw, you got me... nice shot.",
+    ["Arc Blade"]  = "%c[255,72,155,232]Arc: %c[default]\\nOw, you got me... nice shot.",
     ["BlackSpero"] = "%c[255,72,155,232]Arc: %c[default]\\nRenegade down. One less traitor in the zone.",
     ["Crocnballs"] = "%c[255,72,155,232]Arc: %c[default]\\nThe croc didn't make it...", 
 }
@@ -157,9 +157,10 @@ end
 local function notify_rename(chosen_name)
     if not enable_messages then return end
 
-		local text = special_messages[chosen_name]
+    local text = special_messages[chosen_name]
+	
+    if not text then
         text = generic_messages[math.random(1, #generic_messages)]
-		
     end
 
     news_manager.send_tip(db.actor, text, nil, "default", 5000)
