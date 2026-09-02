@@ -7,7 +7,8 @@ local enable_messages = false
 local file_found = false
 local is_enabled = true
 local enable_death_messages = false
-
+local last_generic_message_time = 0
+local generic_message_cooldown = 2
 --[[
     ========================
     MESSAGES AND SPECIAL NAMES
@@ -102,7 +103,10 @@ function on_mcm_load()
             { id = "enable_messages", type = "check", val = 1, def = true },
 
             -- Death Notification Checkbox Toggle
-            { id = "enable_death_messages", type = "check", val = 1, def = true }
+            { id = "enable_death_messages", type = "check", val = 1, def = true },
+			
+			-- Generic Message Cooldown Slider (seconds)
+            { id = "generic_message_cooldown", type = "track", val = 2, def = 2, min = 0, max = 60, step = 1 }
         }
     }
     return op
@@ -161,12 +165,19 @@ end
 local function notify_rename(chosen_name)
     if not enable_messages then return end
 
-    local text = special_messages[chosen_name]
-	
-    if not text then
-        text = generic_messages[math.random(1, #generic_messages)]
+    local special_text = special_messages[chosen_name]
+    if special_text then
+        news_manager.send_tip(db.actor, special_text, nil, "default", 5000)
+        return
     end
 
+    local current_time = time_global()
+    if current_time < last_generic_message_time + (generic_message_cooldown * 1000) then
+        return -- still on cooldown, skip the message
+    end
+    last_generic_message_time = current_time
+
+    local text = generic_messages[math.random(1, #generic_messages)]
     news_manager.send_tip(db.actor, text, nil, "default", 5000)
 end
 

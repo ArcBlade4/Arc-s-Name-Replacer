@@ -14,6 +14,14 @@
     <string id="ui_mcm_arc_name_replacer_spawn_chance_desc">
         <text>Percentage probability that a special name will appear.</text>
     </string>
+	
+	<string id="ui_mcm_arc_name_replacer_generic_message_cooldown">
+        <text>Generic Message Cooldown (seconds)</text>
+    </string>
+    <string id="ui_mcm_arc_name_replacer_generic_message_cooldown_desc">
+        <text>Minimum time between generic PDA alerts. Special named stalkers always notify regardless of this cooldown.</text>
+    </string>
+
     
     <!-- Checkbox Labels -->
     <string id="ui_mcm_arc_name_replacer_enable_messages">
@@ -26,6 +34,6 @@
         <text>Enable Death Alerts</text>
     </string>
     <string id="ui_mcm_arc_name_replacer_enable_messages_desc">
-        <text>Toggle to turn on/off notifications whe you kill a renamed stalker.</text>
+        <text>Toggle to turn on/off notifications when you kill a renamed stalker.</text>
     </string>
 </string_table>
