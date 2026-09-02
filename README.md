@@ -1,5 +1,5 @@
 # Arc's Name Replacer
-Arc' Name Replacer Version: 1.5
+Arc' Name Replacer Version: 1.5.1
 
 ## Mod Description: 
 
@@ -27,6 +27,8 @@ Enable Death Alerts (bool)(default: true) - Toggle to turn on/off notifications 
 
 
 ## Changelog:
+
+v1.5.1: Added some more special messages 
 
 v1.5: Fixed issue where npc could be renamed when joining/leaving squad
 
