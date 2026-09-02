@@ -25,6 +25,7 @@ Enable PDA Alerts (bool)(default: true) - Turn on/off PDA alerts for when a stal
 
 Enable Death Alerts (bool)(default: true) - Toggle to turn on/off notifications when you kill a renamed stalker.
 
+Generic Message Cooldown (float 0-60)(default:2) - Time in seconds between generic PDA alerts. Special named stalkers always notify regardless of this cooldown.
 
 ## Changelog:
 
