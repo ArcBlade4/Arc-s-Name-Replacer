@@ -20,6 +20,8 @@ local special_messages = {
     ["Arc Blade"]  = "%c[255,72,155,232]Arc: %c[default]\\nKnock knock, guess who?",
     ["BlackSpero"] = "%c[255,72,155,232]Arc: %c[default]\\nYo, there's a renegade in disguise nearby...",
     ["Crocnballs"] = "%c[255,72,155,232]Arc: %c[default]\\nHold up, a croc has dangled into the zone...",
+	["Bloodsuckerfucker"] = "%c[255,72,155,232]Arc: %c[default]\\nYou would not believe what I just saw...",
+	["Veno"] = "%c[255,72,155,232]Arc: %c[default]\\nSo, a doppelganger just showed up...",
 }
 
 -- regular confirmation messages
@@ -34,7 +36,9 @@ local generic_messages = {
 local special_kill_messages = {
     ["Arc Blade"]  = "%c[255,72,155,232]Arc: %c[default]\\nOw, you got me... nice shot.",
     ["BlackSpero"] = "%c[255,72,155,232]Arc: %c[default]\\nRenegade down. One less traitor in the zone.",
-    ["Crocnballs"] = "%c[255,72,155,232]Arc: %c[default]\\nThe croc didn't make it...", 
+    ["Crocnballs"] = "%c[255,72,155,232]Arc: %c[default]\\nThe croc didn't make it...",
+	["Bloodsuckerfucker"] = "%c[255,72,155,232]Arc: %c[default]\\nPervert down, rest in piss...",
+	["Veno"] = "%c[255,72,155,232]Arc: %c[default]\\nIs this foreshadowing?",
 }
 
 -- regular kill messages
