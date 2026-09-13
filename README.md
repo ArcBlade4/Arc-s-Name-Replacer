@@ -1,5 +1,5 @@
 # Arc's Name Replacer
-Arc' Name Replacer Version: 1.6
+Arc' Name Replacer Version: 1.7
 
 ## Mod Description: 
 
@@ -27,7 +27,11 @@ Enable Death Alerts (bool)(default: true) - Toggle to turn on/off notifications 
 
 Generic Message Cooldown (float 0-60)(default:2) - Time in seconds between generic PDA alerts. Special named stalkers always notify regardless of this cooldown.
 
+Enable Debug Logging (bool)(default: false) - Prints the remaining names in the pool and the current cooldown status to the log every 10 seconds.
+
 ## Changelog:
+
+v1.7: Added debugging tools
 
 v1.6: Added cooldown for generic messages
 
