@@ -2,13 +2,16 @@ local donator_pool = {}
 local processed_npcs = {}
 local renamed_npcs = {}
 local last_check_time = 0
+local last_generic_message_time = 0 -- time of the last generic (non-special) rename message
+local last_debug_time = 0 -- time of the last debug print
 local spawn_chance = 1
 local enable_messages = false
 local file_found = false
 local is_enabled = true
 local enable_death_messages = false
-local last_generic_message_time = 0
-local generic_message_cooldown = 2
+local generic_message_cooldown = 300 -- seconds between generic rename messages, from mcm
+local debug_enabled = false -- prints donator pool size + cooldown status to the log, from mcm
+
 --[[
     ========================
     MESSAGES AND SPECIAL NAMES
@@ -25,7 +28,7 @@ local special_messages = {
 	["Veno"] = "%c[255,72,155,232]Arc: %c[default]\\nSo, a doppelganger just showed up...",
 }
 
--- regular confirmation messages
+-- regular confirmation messages, subject to the generic message cooldown
 local generic_messages = {
     "%c[255,72,155,232]Arc: %c[default]\\nHeads up, someone special's lurking....",
     "%c[255,72,155,232]Arc: %c[default]\\nSomeone special's out there now, exploring the zone...",
@@ -72,7 +75,7 @@ local function load_names()
     local file = io.open(file_path, "r")
 
     if file then -- check if file exists
-        printf("VNM: Found names.txt, loading names...")
+        printf("ANR: Found names.txt, loading names...")
         for line in file:lines() do -- read all lines
             local clean_name = line:gsub("^%s*(.-)%s*$", "%1")
             if clean_name ~= "" then
@@ -80,10 +83,10 @@ local function load_names()
             end
         end
         file:close()
-        printf("VNM: Successfully loaded " .. #donator_pool .. " names from text file.")
+        printf("ANR: Successfully loaded " .. #donator_pool .. " names from text file.")
         file_found = true
     else -- error message for if file not found
-        printf("VNM: WARNING! names.txt not found. looked here: " .. tostring(file_path))
+        printf("ANR: WARNING! names.txt not found. looked here: " .. tostring(file_path))
     end
 end
 
@@ -104,9 +107,12 @@ function on_mcm_load()
 
             -- Death Notification Checkbox Toggle
             { id = "enable_death_messages", type = "check", val = 1, def = true },
-			
-			-- Generic Message Cooldown Slider (seconds)
-            { id = "generic_message_cooldown", type = "track", val = 2, def = 2, min = 0, max = 60, step = 1 }
+
+            -- Generic Message Cooldown Slider (seconds)
+            { id = "generic_message_cooldown", type = "track", val = 2, def = 300, min = 0, max = 3600, step = 10 },
+
+            -- Debug Info Checkbox Toggle
+            { id = "debug_enabled", type = "check", val = 1, def = false }
         }
     }
     return op
@@ -118,22 +124,26 @@ function load_settings()
         spawn_chance = ui_mcm.get("arc_name_replacer/spawn_chance")
         enable_messages = ui_mcm.get("arc_name_replacer/enable_messages")
         enable_death_messages = ui_mcm.get("arc_name_replacer/enable_death_messages") -- was missing, checkbox did nothing without this
+        generic_message_cooldown = ui_mcm.get("arc_name_replacer/generic_message_cooldown")
+        debug_enabled = ui_mcm.get("arc_name_replacer/debug_enabled")
     end
 end
 
 -- saving stuff
 local function save_state(m_data)
-    m_data.vnm_donator_pool = donator_pool
-    m_data.vnm_processed_npcs = processed_npcs
-    m_data.vnm_renamed_npcs = renamed_npcs
-    m_data.vnm_names_loaded = file_found
+    m_data.ANR_donator_pool = donator_pool
+    m_data.ANR_processed_npcs = processed_npcs
+    m_data.ANR_renamed_npcs = renamed_npcs
+    m_data.ANR_names_loaded = file_found
+    m_data.ANR_last_generic_message_time = last_generic_message_time
 end
 
 local function load_state(m_data)
-    donator_pool = m_data.vnm_donator_pool or donator_pool
-    processed_npcs = m_data.vnm_processed_npcs or processed_npcs
-    renamed_npcs = m_data.vnm_renamed_npcs or renamed_npcs
-    file_found = m_data.vnm_names_loaded or file_found
+    donator_pool = m_data.ANR_donator_pool or donator_pool
+    processed_npcs = m_data.ANR_processed_npcs or processed_npcs
+    renamed_npcs = m_data.ANR_renamed_npcs or renamed_npcs
+    file_found = m_data.ANR_names_loaded or file_found
+    last_generic_message_time = m_data.ANR_last_generic_message_time or last_generic_message_time
 end
 
 -- makes name load once
@@ -167,10 +177,12 @@ local function notify_rename(chosen_name)
 
     local special_text = special_messages[chosen_name]
     if special_text then
+        -- special names always notify, no cooldown
         news_manager.send_tip(db.actor, special_text, nil, "default", 5000)
         return
     end
 
+    -- generic message, only send if the cooldown has expired
     local current_time = time_global()
     if current_time < last_generic_message_time + (generic_message_cooldown * 1000) then
         return -- still on cooldown, skip the message
@@ -187,7 +199,7 @@ local function try_rename_npc(npc)
 
     -- check if npc is important
     if not is_generic_profile(profile) then
-        printf("VNM: Protected Unique NPC found (" .. profile .. "). Skipping donator rename roll.")
+        printf("ANR: Protected Unique NPC found (" .. profile .. "). Skipping donator rename roll.")
         return
     end
 
@@ -229,6 +241,22 @@ local function on_npc_killed(victim, who)
     news_manager.send_tip(db.actor, text, nil, "default", 5000)
 end
 
+-- prints pool size + cooldown status to the log every 10s while debug is on
+local function debug_print()
+    if not debug_enabled then return end
+
+    local current_time = time_global()
+    if current_time < last_debug_time + 10000 then return end -- only print once every 10 seconds
+    last_debug_time = current_time
+
+    local cooldown_remaining = (last_generic_message_time + (generic_message_cooldown * 1000)) - current_time
+    if cooldown_remaining < 0 then cooldown_remaining = 0 end
+
+    printf("ANR DEBUG: names remaining in pool: " .. #donator_pool)
+    printf("ANR DEBUG: generic message cooldown remaining: " .. (cooldown_remaining / 1000) .. "s (cooldown set to " .. generic_message_cooldown .. "s)")
+    printf("ANR DEBUG: enable_messages=" .. tostring(enable_messages) .. " enable_death_messages=" .. tostring(enable_death_messages) .. " spawn_chance=" .. tostring(spawn_chance) .. " file_found=" .. tostring(file_found))
+end
+
 -- npc scanner
 function execute_scanner_loop()
     if not is_enabled then return end
@@ -237,6 +265,8 @@ function execute_scanner_loop()
 
     if (current_time < last_check_time + 2000) then return end
     last_check_time = current_time
+
+    debug_print()
 
     -- check all ids
     for id = 1, 65534 do
