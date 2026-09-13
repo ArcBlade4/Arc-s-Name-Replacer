@@ -109,7 +109,7 @@ function on_mcm_load()
             { id = "enable_death_messages", type = "check", val = 1, def = true },
 
             -- Generic Message Cooldown Slider (seconds)
-            { id = "generic_message_cooldown", type = "track", val = 2, def = 300, min = 0, max = 3600, step = 10 },
+            { id = "generic_message_cooldown", type = "track", val = 2, def = 1, min = 0, max = 60, step = 1 },
 
             -- Debug Info Checkbox Toggle
             { id = "debug_enabled", type = "check", val = 1, def = false }
