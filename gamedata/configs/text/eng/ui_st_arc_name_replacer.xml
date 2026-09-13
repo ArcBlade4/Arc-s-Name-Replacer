@@ -39,7 +39,6 @@
 	<string id="ui_mcm_arc_name_replacer_debug_enabled">
         <text>Enable Debug Logging</text>
     </string>
-
 	<string id="ui_mcm_arc_name_replacer_debug_enabled_desc">
         <text>Prints the remaining names in the pool and the current cooldown status to the log every 10 seconds.</text>
     </string>
