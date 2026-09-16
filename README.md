@@ -1,5 +1,5 @@
 # Arc's Name Replacer
-Arc' Name Replacer Version: 1.7
+Arc' Name Replacer Version: 1.8
 
 ## Mod Description: 
 
@@ -29,7 +29,11 @@ Generic Message Cooldown (float 0-60)(default:2) - Time in seconds between gener
 
 Enable Debug Logging (bool)(default: false) - Prints the remaining names in the pool and the current cooldown status to the log every 10 seconds.
 
+Enable Map Markers (bool)(default: true) - Toggle to show a map marker for renamed stalkers until you meet or kill them..
+
 ## Changelog:
+
+v1.8: Added toggleable map markers for renamed stalkers
 
 v1.7: Added debugging tools
 
