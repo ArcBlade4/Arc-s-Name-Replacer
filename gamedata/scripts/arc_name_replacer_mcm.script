@@ -69,7 +69,12 @@ local generic_kill_messages = {
 
 --=====================================================
 -- MAP MARKERS
---=====================================================q
+--=====================================================
+
+local function is_friendly_or_neutral(npc)
+    return npc:relation(db.actor) ~= game_object.enemy
+end
+
 local function add_marker(id)
     if not enable_map_markers then return end
     level.map_add_object_spot(id, MARKER_SPOT_TYPE, MARKER_HINT)
@@ -98,10 +103,19 @@ end
 
 -- A renamed NPC died -> drop their marker
 local function npc_on_death_callback(victim, who)
+	printf("ANR: removed marker")
+	
     if victim and renamed_npcs[victim:name()] then
-        remove_marker(victim:id())
+		remove_marker(victim:id())
     end
 end
+
+local function npc_on_fighting_actor(npc)
+    if npc and renamed_npcs[npc:name()] then
+        remove_marker(npc:id())
+    end
+end
+
 
 --=====================================================
 -- NAME POOL / FILE LOADING
@@ -287,11 +301,13 @@ end
 
 -- kill check
 local function on_npc_killed(victim, who)
+	
     if not victim then return end
 
     local data = renamed_npcs[victim:name()]
     if not data then return end
 
+	npc_on_death_callback(victim, who)
     renamed_npcs[victim:name()] = nil
 
     if not enable_death_messages then return end
@@ -338,7 +354,9 @@ local function on_npc_spawn(npc)
     try_rename_npc(npc)
 
     if renamed_npcs[npc:name()] then
-        add_marker(npc:id())
+		if is_friendly_or_neutral(npc) then
+			add_marker(npc:id())
+        end
     end
 end
 
@@ -348,7 +366,9 @@ end
 
 function on_game_start()
 	RegisterScriptCallback("npc_on_net_spawn", on_npc_spawn)
+	RegisterScriptCallback("npc_on_hit_callback", npc_on_hit_callback)
     RegisterScriptCallback("npc_on_death_callback", on_npc_killed)
+	RegisterScriptCallback("npc_on_fighting_actor", npc_on_fighting_actor)
     RegisterScriptCallback("save_state", save_state)
     RegisterScriptCallback("load_state", load_state)
 	RegisterScriptCallback("npc_on_use", npc_on_use)
