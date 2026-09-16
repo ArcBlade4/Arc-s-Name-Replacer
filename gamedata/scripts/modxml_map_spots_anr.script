@@ -1,0 +1,19 @@
+addon_name = "Arc's Name Replacer"
+
+function on_xml_read()
+    RegisterScriptCallback("on_xml_read", 
+        function(xml_file_name, xml_obj)
+            if  (xml_file_name == [[ui\map_spots.xml]]) or
+                (xml_file_name == [[ui\map_spots_16.xml]]) or
+                (xml_file_name == [[ui\map_spots_21.xml]]) then
+                printf("DXML is patching mapspots for %s in %s",addon_name,xml_file_name)
+                
+                local mapspots_include_file = 
+[[
+#include "ui\map_spots_anr.xml"
+]]
+                xml_obj:insertFromXMLString(mapspots_include_file)
+            end
+        end
+    )
+end

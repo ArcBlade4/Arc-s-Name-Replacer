@@ -1,0 +1,12 @@
+	<anr_special_location hint="anr_special_hint">
+		<level_map spot="anr_special_pda_spot"/>
+		<mini_map  spot="anr_special_mini_spot"/>
+	</anr_special_location>
+
+	<anr_special_mini_spot width="7" height="7" stretch="1" alignment="c" location_level="5">
+		<texture r="72" g="155" b="232">ui_mmap_common_actor</texture>
+	</anr_special_mini_spot>
+
+	<anr_special_pda_spot width="8" height="8" stretch="1" alignment="c" location_level="5">
+		<texture r="72" g="155" b="232">ui_mmap_common_actor</texture>
+	</anr_special_pda_spot>

@@ -1,7 +1,7 @@
 <string_table>
     <!-- Menu Title in MCM Sidebar -->
     <string id="ui_mcm_menu_arc_name_replacer">
-        <text>Arc's Stalker Name Replacer</text>
+        <text>Arc's Name Replacer</text>
     </string>
     <string id="ui_mcm_arc_name_replacer_title">
         <text>Settings</text>
@@ -33,7 +33,7 @@
     <string id="ui_mcm_arc_name_replacer_enable_death_messages">
         <text>Enable Death Alerts</text>
     </string>
-    <string id="ui_mcm_arc_name_replacer_enable_messages_desc">
+    <string id="ui_mcm_arc_name_replacer_enable_death_messages_desc">
         <text>Toggle to turn on/off notifications when you kill a renamed stalker.</text>
     </string>
 	<string id="ui_mcm_arc_name_replacer_debug_enabled">
@@ -41,6 +41,12 @@
     </string>
 	<string id="ui_mcm_arc_name_replacer_debug_enabled_desc">
         <text>Prints the remaining names in the pool and the current cooldown status to the log every 10 seconds.</text>
+    </string>
+    <string id="ui_mcm_arc_name_replacer_enable_map_markers">
+        <text>Enable Map Markers</text>
+    </string>
+    <string id="ui_mcm_arc_name_replacer_enable_map_markers_desc">
+        <text>Toggle to show a map marker for renamed stalkers until you meet or kill them.</text>
     </string>
 
 </string_table>
