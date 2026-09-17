@@ -26,11 +26,12 @@ local MARKER_HINT = "Someone special"
 -- edit this to add special messages on rename
 local special_messages = {
     ["Arc Blade"]  = "%c[255,72,155,232]Arc: %c[default]\\nKnock knock, guess who?",
-    ["Dusty"] = "%c[255,72,155,232]Arc: %c[default]\\nYo, there's a renegade in disguise nearby...",
+    ["BlackSpero"] = "%c[255,72,155,232]Arc: %c[default]\\nYo, there's a renegade in disguise nearby...",
     ["Crocnballs"] = "%c[255,72,155,232]Arc: %c[default]\\nHold up, a croc has dangled into the zone...",
     ["BloodsuckerFucker"] = "%c[255,72,155,232]Arc: %c[default]\\nYou would not believe what I just saw...",
-	["PsysuckerFucker"] = "%c[255,72,155,232]Arc: %c[default]\\nAnd I thought I've seen everything...",
+	["PsysuckerFucker"] = "%c[255,72,155,232]Arc: %c[default]\\nWell, you've got a chance at revenge now...",
     ["Veno"] = "%c[255,72,155,232]Arc: %c[default]\\nSo, a doppelganger just showed up...",
+	["PaeleSaint"] = "%c[255,72,155,232]Arc: %c[default]\\nWatch out, there's a zealous fanatic wandering amongst us!",
 }
 
 -- regular confirmation messages, subject to the generic message cooldown
@@ -46,11 +47,12 @@ local generic_messages = {
 -- edit this to add special messages on kill
 local special_kill_messages = {
     ["Arc Blade"]  = "%c[255,72,155,232]Arc: %c[default]\\nWow, after everything I've done, you monster.",
-    ["Dusty"] = "%c[255,72,155,232]Arc: %c[default]\\nRenegade down. One less traitor in the zone.",
+    ["BlackSpero"] = "%c[255,72,155,232]Arc: %c[default]\\nRenegade down. One less traitor in the zone.",
     ["Crocnballs"] = "%c[255,72,155,232]Arc: %c[default]\\nThe croc didn't make it...",
     ["BloodsuckerFucker"] = "%c[255,72,155,232]Arc: %c[default]\\nPervert down, rest in piss...",
     ["Veno"] = "%c[255,72,155,232]Arc: %c[default]\\nIs this foreshadowing?",
-	["PsysuckerFucker"] = "%c[255,72,155,232]Arc: %c[default]\\nHopefully he remebered to delete his browser history...",
+	["PsysuckerFucker"] = "%c[255,72,155,232]Arc: %c[default]\\nHopefully he remebered to delete his browser history.",
+	["PaeleSaint"] = "%c[255,72,155,232]Arc: %c[default]\\nFantic down, gone to the big monolith in the sky...",
 }
 
 -- regular kill messages
@@ -279,7 +281,7 @@ local function try_rename_npc(npc)
     end
 
     if not (file_found and #donator_pool ~= 0) then return end
-
+	
     local roll = math.random() * 100
     if roll > spawn_chance then return end
 
@@ -375,5 +377,6 @@ function on_game_start()
     RegisterScriptCallback("npc_on_death_callback", npc_on_death_callback)
     load_settings()
     ensure_names_loaded()
-	refresh_markers()
+	refresh_markers
+	math.randomseed(os.time())
 end
