@@ -4,7 +4,6 @@
 local donator_pool = {}
 local processed_npcs = {}
 local renamed_npcs = {}
-local last_check_time = 0
 local last_generic_message_time = 0 -- time of the last generic (non-special) rename message
 local last_debug_time = 0 -- time of the last debug print
 local spawn_chance = 1
@@ -100,15 +99,6 @@ local function npc_on_use(npc, who)
     if npc and renamed_npcs[npc:name()] then
         remove_marker(npc:id())
         renamed_npcs[npc:name()] = nil
-    end
-end
-
--- A renamed NPC died -> drop their marker
-local function npc_on_death_callback(victim, who)
-	printf("ANR: removed marker")
-	
-    if victim and renamed_npcs[victim:name()] then
-		remove_marker(victim:id())
     end
 end
 
@@ -273,13 +263,13 @@ end
 -- does the actual rename roll + rename for one npc
 local function try_rename_npc(npc)
     local profile = npc:profile_name() or "" -- open npc profile
-
+	
     -- check if npc is important
     if not is_generic_profile(profile) then
         printf("ANR: Protected Unique NPC found (" .. profile .. "). Skipping donator rename roll.")
         return
     end
-
+	
     if not (file_found and #donator_pool ~= 0) then return end
 	
     local roll = math.random() * 100
@@ -308,8 +298,8 @@ local function on_npc_killed(victim, who)
 
     local data = renamed_npcs[victim:name()]
     if not data then return end
-
-	npc_on_death_callback(victim, who)
+	
+	remove_marker(victim:id())
     renamed_npcs[victim:name()] = nil
 
     if not enable_death_messages then return end
@@ -351,10 +341,19 @@ end
 local function on_npc_spawn(npc)
     if not is_enabled then return end
     if not npc or not IsStalker(npc) or not npc:alive() then return end
+	
+    local npc_name = npc:name()
 
     debug_print()
-    try_rename_npc(npc)
 
+    if not processed_npcs[npc_name] then
+        try_rename_npc(npc)
+        processed_npcs[npc_name] = true
+    end
+
+	
+    try_rename_npc(npc)
+	
     if renamed_npcs[npc:name()] then
 		if is_friendly_or_neutral(npc) then
 			add_marker(npc:id())
@@ -368,15 +367,13 @@ end
 
 function on_game_start()
 	RegisterScriptCallback("npc_on_net_spawn", on_npc_spawn)
-	RegisterScriptCallback("npc_on_hit_callback", npc_on_hit_callback)
     RegisterScriptCallback("npc_on_death_callback", on_npc_killed)
 	RegisterScriptCallback("npc_on_fighting_actor", npc_on_fighting_actor)
     RegisterScriptCallback("save_state", save_state)
     RegisterScriptCallback("load_state", load_state)
 	RegisterScriptCallback("npc_on_use", npc_on_use)
-    RegisterScriptCallback("npc_on_death_callback", npc_on_death_callback)
     load_settings()
     ensure_names_loaded()
-	refresh_markers
+	refresh_markers()
 	math.randomseed(os.time())
 end
