@@ -351,8 +351,7 @@ local function on_npc_spawn(npc)
         processed_npcs[npc_name] = true
     end
 
-	
-    try_rename_npc(npc)
+	
 	
     if renamed_npcs[npc:name()] then
 		if is_friendly_or_neutral(npc) then
