@@ -507,8 +507,7 @@ local function on_npc_spawn(npc)
 
     debug_print()
 
-    -- roll once per npc ever. (the old unguarded second try_rename_npc call was
-    -- removed: it re-rolled on every net_spawn and could overwrite existing names)
+    -- roll once per npc ever.
     if not processed_npcs[npc_name] then
         try_rename_npc(npc)
         processed_npcs[npc_name] = true
