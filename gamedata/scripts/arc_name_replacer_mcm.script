@@ -4,8 +4,10 @@
 local donator_pool = {}
 local processed_npcs = {}
 local renamed_npcs = {}
+local tracked_npcs = {} -- [npc_id] = { name=, status=, last_seen={...}, last_level= }  (never cleared)
 local last_generic_message_time = 0 -- time of the last generic (non-special) rename message
 local last_debug_time = 0 -- time of the last debug print
+local last_poll_time = 0 -- time of the last sighting poll
 local spawn_chance = 1
 local enable_messages = false
 local file_found = false
@@ -16,6 +18,8 @@ local debug_enabled = false -- prints donator pool size + cooldown status to the
 local enable_map_markers = true -- whether renamed npcs get a map marker, from mcm
 local MARKER_SPOT_TYPE = "anr_special_location"
 local MARKER_HINT = "Someone special"
+local SIGHTING_DISTANCE = 60 -- metres, max distance for a "seen" to count
+local SIGHTING_POLL_MS = 1000 -- how often to check for sightings
 
 --=====================================================
 -- MESSAGES AND SPECIAL NAMES
@@ -69,6 +73,133 @@ local generic_kill_messages = {
 ]]--
 
 --=====================================================
+-- TIME HELPERS
+-- CTime objects don't serialize, so store them as plain tables.
+--=====================================================
+
+local function ctime_to_table(t)
+    local y, m, d, h, mi, s, ms = 0, 0, 0, 0, 0, 0, 0
+    y, m, d, h, mi, s, ms = t:get(y, m, d, h, mi, s, ms)
+    return { y, m, d, h, mi, s, ms }
+end
+
+local function ctime_from_table(tb)
+    local t = game.CTime()
+    t:set(tb[1], tb[2], tb[3], tb[4], tb[5], tb[6], tb[7])
+    return t
+end
+
+-- "just now" / "5h ago" / "3d ago"
+local function time_ago(tb)
+    if not tb then return game.translate_string("ui_anr_tracker_never") end
+    local secs = game.get_game_time():diffSec(ctime_from_table(tb))
+    local hours = math.floor(secs / 3600)
+    if hours < 1 then return game.translate_string("ui_anr_tracker_just_now") end
+    if hours < 24 then return hours .. "h " .. game.translate_string("ui_anr_tracker_ago") end
+    return math.floor(hours / 24) .. "d " .. game.translate_string("ui_anr_tracker_ago")
+end
+
+--=====================================================
+-- LEVEL NAMES
+-- Turns internal ids (k00_marsh) into display names (Great Swamps).
+-- Add entries here for extra maps from other mods.
+--=====================================================
+
+local LEVEL_NAMES = {
+    l01_escape            = "Cordon",
+    l02_garbage           = "Garbage",
+    l03_agroprom          = "Agroprom",
+    l03u_agr_underground  = "Agroprom Underground",
+    l04_darkvalley        = "Dark Valley",
+    l04u_labx18           = "Lab X18",
+    l05_bar               = "Rostok",
+    l06_rostok            = "Rostok",
+    l07_military          = "Army Warehouses",
+    l08_yantar            = "Yantar",
+    l08u_brainlab         = "Lab X16",
+    l10_radar             = "Radar",
+    l10_limansk           = "Limansk",
+    l10_red_forest        = "Red Forest",
+    l10u_bunker           = "Lab X10",
+    l11_pripyat           = "Pripyat",
+    l12_stancia           = "Chernobyl NPP",
+    l12_stancia_2         = "Chernobyl NPP",
+    l12u_control_monolith = "Monolith Control Center",
+    l12u_sarcofag         = "Sarcophagus",
+    k00_marsh             = "Great Swamps",
+    k01_darkscape         = "Darkscape",
+    k02_trucks_cemetery   = "Truck Cemetery",
+    zaton                 = "Zaton",
+    jupiter               = "Jupiter",
+    jupiter_underground   = "Jupiter Underground",
+    pripyat               = "Outskirts",
+    labx8                 = "Lab X8",
+}
+
+local function level_display_name(id)
+    if not id then return "?" end
+    if LEVEL_NAMES[id] then return LEVEL_NAMES[id] end
+    -- unknown map: try the game's own string table, else show the raw id
+    local tr = game.translate_string(id)
+    if tr and tr ~= "" and tr ~= id then return tr end
+    return id
+end
+
+--=====================================================
+-- TRACKER (persistent record of renamed stalkers the player has met)
+--=====================================================
+
+local function stamp_seen(entry)
+    entry.last_seen = ctime_to_table(game.get_game_time())
+    entry.last_level = level.name()
+end
+
+-- portrait + faction, saved so they still show when the npc is offline/dead
+local function store_identity(entry, npc)
+    local icon = npc:character_icon()
+    local community = npc:character_community()
+    if icon and icon ~= "" then entry.icon = icon end
+    if community and community ~= "" then entry.community = community end
+end
+
+-- creates the entry if needed and stamps it
+local function track(npc, name)
+    local id = npc:id()
+    if not tracked_npcs[id] then
+        tracked_npcs[id] = { name = name, status = "alive" }
+    end
+    store_identity(tracked_npcs[id], npc)
+    stamp_seen(tracked_npcs[id])
+end
+
+-- catches deaths that happened offline (npc_on_death_callback only fires online)
+local function refresh_status(id, e)
+    if e.status ~= "alive" then return end
+    local se = alife_object(id)
+    if not se or (se.alive and not se:alive()) then
+        e.status = "dead"
+    end
+end
+
+-- throttled poll: stamp "last seen" while a tracked npc is in view and close
+local function actor_on_update()
+    local now = time_global()
+    if now < last_poll_time + SIGHTING_POLL_MS then return end
+    last_poll_time = now
+
+    for id, e in pairs(tracked_npcs) do
+        if e.status == "alive" then
+            local obj = level.object_by_id(id)
+            if obj and obj:alive() and db.actor:see(obj)
+               and obj:position():distance_to(db.actor:position()) < SIGHTING_DISTANCE then
+                stamp_seen(e)
+                if not e.icon then store_identity(e, obj) end
+            end
+        end
+    end
+end
+
+--=====================================================
 -- MAP MARKERS
 --=====================================================
 
@@ -94,9 +225,11 @@ local function refresh_markers()
     end
 end
 
--- Player talked to a renamed NPC -> drop their marker
+-- Player talked to a renamed NPC -> track them and drop their marker
 local function npc_on_use(npc, who)
-    if npc and renamed_npcs[npc:name()] then
+    local data = npc and renamed_npcs[npc:name()]
+    if data then
+        track(npc, data.chosen_name) -- before nil-ing renamed_npcs, we need chosen_name
         remove_marker(npc:id())
         renamed_npcs[npc:name()] = nil
     end
@@ -222,6 +355,7 @@ local function save_state(m_data)
     m_data.ANR_donator_pool = donator_pool
     m_data.ANR_processed_npcs = processed_npcs
     m_data.ANR_renamed_npcs = renamed_npcs
+    m_data.ANR_tracked_npcs = tracked_npcs
     m_data.ANR_names_loaded = file_found
     m_data.ANR_last_generic_message_time = last_generic_message_time
 end
@@ -230,6 +364,7 @@ local function load_state(m_data)
     donator_pool = m_data.ANR_donator_pool or donator_pool
     processed_npcs = m_data.ANR_processed_npcs or processed_npcs
     renamed_npcs = m_data.ANR_renamed_npcs or renamed_npcs
+    tracked_npcs = m_data.ANR_tracked_npcs or tracked_npcs
     file_found = m_data.ANR_names_loaded or file_found
     last_generic_message_time = m_data.ANR_last_generic_message_time or last_generic_message_time
 end
@@ -262,6 +397,9 @@ end
 
 -- does the actual rename roll + rename for one npc
 local function try_rename_npc(npc)
+    -- safety net: never rename an npc that already has a name from us
+    if renamed_npcs[npc:name()] then return end
+
     local profile = npc:profile_name() or "" -- open npc profile
 	
     -- check if npc is important
@@ -293,22 +431,41 @@ end
 
 -- kill check
 local function on_npc_killed(victim, who)
-	
     if not victim then return end
 
+    local id = victim:id()
     local data = renamed_npcs[victim:name()]
-    if not data then return end
-	
-	remove_marker(victim:id())
+    local tracked = tracked_npcs[id]
+
+    -- ignore anyone who was never renamed and never tracked.
+    -- (tracked covers npcs the player already talked to, whose renamed_npcs entry is gone)
+    if not data and not tracked then return end
+
+    local chosen_name = (data and data.chosen_name) or tracked.name
+    local by_player = (who and who:id() == 0)
+
+    remove_marker(id)
     renamed_npcs[victim:name()] = nil
 
+    -- Tracker rules: a renamed stalker only enters the tracker if the player has
+    -- met them already (existing entry) or killed them personally. Deaths of
+    -- stalkers the player never interacted with are NOT added.
+    if by_player then
+        track(victim, chosen_name) -- creates the entry if needed and stamps last seen
+    end
+    local entry = tracked_npcs[id]
+    if entry then
+        -- already-tracked npc killed by someone else: mark dead, keep last_seen as is
+        entry.status = by_player and "killed_by_player" or "dead"
+    end
+
+    -- the tracker update above happens before these early returns, so it works with alerts off
     if not enable_death_messages then return end
+    if not by_player then return end
 
-    if not (who and who:id() == 0) then return end
-
-    local text = special_kill_messages[data.chosen_name]
+    local text = special_kill_messages[chosen_name]
     if not text then
-        text = generic_kill_messages[math.random(1, #generic_kill_messages)] .. data.chosen_name .. "..."
+        text = generic_kill_messages[math.random(1, #generic_kill_messages)] .. chosen_name .. "..."
     end
 
     news_manager.send_tip(db.actor, text, nil, "default", 5000)
@@ -329,7 +486,11 @@ local function debug_print()
     local cooldown_remaining = (last_generic_message_time + (generic_message_cooldown * 1000)) - current_time
     if cooldown_remaining < 0 then cooldown_remaining = 0 end
 
+    local tracked_count = 0
+    for _ in pairs(tracked_npcs) do tracked_count = tracked_count + 1 end
+
     printf("ANR DEBUG: names remaining in pool: " .. #donator_pool)
+    printf("ANR DEBUG: tracked npcs: " .. tracked_count)
     printf("ANR DEBUG: generic message cooldown remaining: " .. (cooldown_remaining / 1000) .. "s (cooldown set to " .. generic_message_cooldown .. "s)")
     printf("ANR DEBUG: enable_messages=" .. tostring(enable_messages) .. " enable_death_messages=" .. tostring(enable_death_messages) .. " spawn_chance=" .. tostring(spawn_chance) .. " file_found=" .. tostring(file_found))
 end
@@ -346,18 +507,55 @@ local function on_npc_spawn(npc)
 
     debug_print()
 
+    -- roll once per npc ever. (the old unguarded second try_rename_npc call was
+    -- removed: it re-rolled on every net_spawn and could overwrite existing names)
     if not processed_npcs[npc_name] then
         try_rename_npc(npc)
         processed_npcs[npc_name] = true
     end
-
-	
 	
     if renamed_npcs[npc:name()] then
 		if is_friendly_or_neutral(npc) then
 			add_marker(npc:id())
         end
     end
+end
+
+--=====================================================
+-- TRACKER DATA FOR THE PDA TAB (see ui_pda_anr_tracker_tab.script)
+--=====================================================
+
+local STATUS_KEYS = {
+    alive = "ui_anr_tracker_alive",
+    dead = "ui_anr_tracker_dead",
+    killed_by_player = "ui_anr_tracker_killed",
+}
+
+local STATUS_COLORS = {
+    alive = { 255, 120, 220, 120 },
+    dead = { 255, 180, 180, 180 },
+    killed_by_player = { 255, 230, 90, 90 },
+}
+
+-- Public: used by ui_pda_anr_tracker_tab.script (the PDA tab).
+-- Returns a sorted list of display-ready rows and refreshes offline deaths.
+function get_tracker_rows()
+    local rows = {}
+    for id, e in pairs(tracked_npcs) do
+        refresh_status(id, e)
+        table.insert(rows, {
+            name = e.name or "?",
+            icon = e.icon,
+            community = e.community,
+            faction_text = e.community and game.translate_string(e.community) or "",
+            status_text = game.translate_string(STATUS_KEYS[e.status] or "ui_anr_tracker_alive"),
+            color = STATUS_COLORS[e.status] or STATUS_COLORS.alive,
+            seen_text = time_ago(e.last_seen),
+            level_text = e.last_level and level_display_name(e.last_level) or "",
+        })
+    end
+    table.sort(rows, function(a, b) return a.name < b.name end)
+    return rows
 end
 
 --=====================================================
@@ -371,6 +569,17 @@ function on_game_start()
     RegisterScriptCallback("save_state", save_state)
     RegisterScriptCallback("load_state", load_state)
 	RegisterScriptCallback("npc_on_use", npc_on_use)
+    RegisterScriptCallback("actor_on_update", actor_on_update)
+    -- PDA tab through Mod App Creator (same framework iTheon's Taskboard uses).
+    -- The tracker is only reachable through this PDA tab, so Mod App Creator is required.
+    if mac_mcm and mac_mcm.add_app then
+        mac_mcm.add_app("anr_tracker", {
+            name = "ui_anr_tracker_title",
+            texture = "ui_anr_tracker_icon", -- placeholder icon, swap for your own
+            tab = "eptAnrTracker",
+            func = ui_pda_anr_tracker_tab.get_ui,
+        })
+    end
     load_settings()
     ensure_names_loaded()
 	refresh_markers()

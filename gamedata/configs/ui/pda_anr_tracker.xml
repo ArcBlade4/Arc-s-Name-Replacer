@@ -1,0 +1,48 @@
+<w>
+	<!-- No background textures on purpose: the PDA already draws its own frame.
+	     Adjust x/y/width/height below to fit the PDA content area (see pda_taskboard_16.xml). -->
+	<frame_main x="50" y="90" width="820" height="560"/>
+
+	<title x="20" y="10" width="780" height="24">
+		<text font="letterica18" align="l" r="230" g="230" b="230">ui_anr_tracker_title</text>
+	</title>
+
+	<!-- Column headers (aligned with the row cells below; x is offset by the list x of 20) -->
+	<header_name x="82" y="44" width="230" height="20">
+		<text font="letterica16" align="l" r="150" g="150" b="150">ui_anr_tracker_col_name</text>
+	</header_name>
+	<header_status x="330" y="44" width="140" height="20">
+		<text font="letterica16" align="l" r="150" g="150" b="150">ui_anr_tracker_col_status</text>
+	</header_status>
+	<header_seen x="490" y="44" width="300" height="20">
+		<text font="letterica16" align="l" r="150" g="150" b="150">ui_anr_tracker_col_seen</text>
+	</header_seen>
+
+	<tracker_list x="20" y="70" width="780" height="480" item_height="58" always_show_scroll="0" can_select_last_item="0" left_ident="0" right_ident="0" top_indent="0" bottom_indent="0" vert_interval="0"/>
+
+	<empty_text x="20" y="80" width="780" height="24">
+		<text font="letterica16" align="l" r="200" g="200" b="200">ui_anr_tracker_empty</text>
+	</empty_text>
+
+	<!-- Row cells, positions relative to each 780x58 list row -->
+	<row_icon x="4" y="5" width="48" height="48"/>
+	<row_patch x="34" y="5" width="18" height="18"/>
+
+	<row_name x="62" y="8" width="230" height="20">
+		<text font="letterica16" align="l" vert_align="c" r="230" g="230" b="230"/>
+	</row_name>
+	<row_faction x="62" y="30" width="230" height="18">
+		<text font="letterica16" align="l" vert_align="c" r="140" g="140" b="140"/>
+	</row_faction>
+
+	<row_status x="310" y="0" width="140" height="58">
+		<text font="letterica16" align="l" vert_align="c" r="220" g="220" b="220"/>
+	</row_status>
+
+	<row_seen x="470" y="8" width="300" height="20">
+		<text font="letterica16" align="l" vert_align="c" r="220" g="220" b="220"/>
+	</row_seen>
+	<row_level x="470" y="30" width="300" height="18">
+		<text font="letterica16" align="l" vert_align="c" r="140" g="140" b="140"/>
+	</row_level>
+</w>

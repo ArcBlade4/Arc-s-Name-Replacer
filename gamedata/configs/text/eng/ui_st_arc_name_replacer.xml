@@ -49,4 +49,39 @@
         <text>Toggle to show a map marker for renamed stalkers until you meet or kill them.</text>
     </string>
 
+    <!-- Tracker window -->
+    <string id="ui_anr_tracker_title">
+        <text>Tracker</text>
+    </string>
+    <string id="ui_anr_tracker_col_name">
+        <text>Name</text>
+    </string>
+    <string id="ui_anr_tracker_col_status">
+        <text>Status</text>
+    </string>
+    <string id="ui_anr_tracker_col_seen">
+        <text>Last seen</text>
+    </string>
+    <string id="ui_anr_tracker_alive">
+        <text>Alive</text>
+    </string>
+    <string id="ui_anr_tracker_dead">
+        <text>Dead</text>
+    </string>
+    <string id="ui_anr_tracker_killed">
+        <text>Killed by you</text>
+    </string>
+    <string id="ui_anr_tracker_empty">
+        <text>You haven't met any special stalkers yet.</text>
+    </string>
+    <string id="ui_anr_tracker_never">
+        <text>Never</text>
+    </string>
+    <string id="ui_anr_tracker_just_now">
+        <text>Just now</text>
+    </string>
+    <string id="ui_anr_tracker_ago">
+        <text>ago</text>
+    </string>
+
 </string_table>

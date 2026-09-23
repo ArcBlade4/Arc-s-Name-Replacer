@@ -1,0 +1,23 @@
+addon_name = "Arc's Name Replacer"
+
+function on_xml_read()
+    RegisterScriptCallback("on_xml_read",
+        function(file_name, xml_obj)
+            if file_name == [[ui\pda_16.xml]] then
+                printf("DXML is patching pda tab for %s in %s", addon_name, file_name)
+
+                -- Hidden zero-size button so MAC's launcher doesn't break the PDA top bar
+                local new_tab = [[
+<button x="1000" y="0" width="0" height="0" id="eptAnrTracker" frame_mode="0">
+    <text align="c" vert_align="c" x="0" y="0" font="letterica16">ui_anr_tracker_title</text>
+</button>
+]]
+                local res = xml_obj:query("tab")
+                if is_not_empty(res) then
+                    local el = res[1]
+                    xml_obj:insertFromXMLString(new_tab, el, #el.kids)
+                end
+            end
+        end
+    )
+end

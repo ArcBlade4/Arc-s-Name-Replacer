@@ -1,0 +1,9 @@
+<w>
+    <file name="ui\ui_anr_icons">
+        <texture id="ui_anr_tracker_icon"   x="0" y="0" width="64" height="64"/>
+        <texture id="ui_anr_tracker_icon_e" x="0" y="0" width="64" height="64"/>
+        <texture id="ui_anr_tracker_icon_t" x="128" y="0" width="64" height="64"/>
+        <texture id="ui_anr_tracker_icon_h" x="64" y="0" width="64" height="64"/>
+        <texture id="ui_anr_tracker_icon_d" x="192" y="0" width="64" height="64"/>
+    </file>
+</w>

@@ -1,0 +1,146 @@
+-- ANR PDA Tracker Tab (UI only)
+-- Data comes from arc_name_replacer_mcm.get_tracker_rows().
+-- Registered with Mod App Creator in arc_name_replacer_mcm.on_game_start.
+
+local LAYOUT = {
+    WINDOW_W = 1024,
+    WINDOW_H = 768,
+    ROW_W    = 780,
+    ROW_H    = 58,
+    ICON     = 48,   -- portrait size (square)
+}
+
+-- Optional faction patches. Format: community id -> texture name.
+-- Left empty on purpose: fill in with texture names from your install and the
+-- patch will draw in the top-right corner of the portrait. Example:
+--   stalker = "your_stalker_patch_texture",
+local FACTION_PATCHES = {
+}
+
+local DIVIDER_COLOR = GetARGB(70, 200, 200, 200)
+
+local xml = CScriptXmlInit()
+xml:ParseFile("pda_anr_tracker.xml")
+
+--=====================================================
+-- List row
+--=====================================================
+
+class "anr_tracker_row" (CUIListBoxItem)
+
+function anr_tracker_row:__init(row)
+    super()
+    self:SetWndRect(Frect():set(0, 0, LAYOUT.ROW_W, LAYOUT.ROW_H))
+
+    -- portrait (skipped if we never captured one)
+    if row.icon then
+        self.portrait = xml:InitStatic("row_icon", self)
+        self.portrait:InitTexture(row.icon)
+        self.portrait:SetStretchTexture(true)
+    end
+
+    -- faction patch overlay: only when this stalker's community has an explicit,
+    -- non-empty entry in FACTION_PATCHES. No entry = no patch, no default.
+    local patch_tex = nil
+    if row.community then
+        local t = rawget(FACTION_PATCHES, row.community)
+        if type(t) == "string" and t ~= "" then patch_tex = t end
+    end
+    if patch_tex and self.portrait then
+        self.patch = xml:InitStatic("row_patch", self)
+        self.patch:InitTexture(patch_tex)
+        self.patch:SetStretchTexture(true)
+        printf("ANR tab: patch applied name=%s community=%s texture=%s", tostring(row.name), tostring(row.community), patch_tex)
+    end
+
+    self.name = xml:InitTextWnd("row_name", self)
+    self.name:SetText(row.name)
+
+    self.faction = xml:InitTextWnd("row_faction", self)
+    self.faction:SetText(row.faction_text)
+
+    self.status = xml:InitTextWnd("row_status", self)
+    self.status:SetText(row.status_text)
+    local c = row.color
+    self.status:SetTextColor(GetARGB(c[1], c[2], c[3], c[4]))
+
+    self.seen = xml:InitTextWnd("row_seen", self)
+    self.seen:SetText(row.seen_text)
+
+    self.level = xml:InitTextWnd("row_level", self)
+    self.level:SetText(row.level_text)
+
+    -- divider line along the bottom edge of the row
+    local d = CUIStatic()
+    d:SetAutoDelete(true)
+    d:SetWndRect(Frect():set(0, LAYOUT.ROW_H - 2, LAYOUT.ROW_W, LAYOUT.ROW_H - 1))
+    d:InitTexture("ui\\ui_noise")
+    d:SetStretchTexture(true)
+    d:SetTextureColor(DIVIDER_COLOR)
+    self:AttachChild(d)
+end
+
+--=====================================================
+-- Tab
+--=====================================================
+
+local instance = nil
+
+class "pda_anr_tracker_tab" (CUIScriptWnd)
+
+function pda_anr_tracker_tab:__init()
+    super()
+    self._last_update = nil
+    self:InitControls()
+end
+
+function pda_anr_tracker_tab:InitControls()
+    self:SetWndRect(Frect():set(0, 0, LAYOUT.WINDOW_W, LAYOUT.WINDOW_H))
+
+    self.frame = xml:InitStatic("frame_main", self)
+    xml:InitTextWnd("title", self.frame)
+    xml:InitTextWnd("header_name", self.frame)
+    xml:InitTextWnd("header_status", self.frame)
+    xml:InitTextWnd("header_seen", self.frame)
+
+    self.list = xml:InitListBox("tracker_list", self.frame)
+    self:Register(self.list, "tracker_list")
+
+    self.empty_text = xml:InitTextWnd("empty_text", self.frame)
+    self.empty_text:Show(false)
+end
+
+function pda_anr_tracker_tab:Populate()
+    self.list:RemoveAll()
+
+    local rows = arc_name_replacer_mcm.get_tracker_rows()
+    self.empty_text:Show(#rows == 0)
+
+    for _, row in ipairs(rows) do
+        self.list:AddExistingItem(anr_tracker_row(row))
+    end
+end
+
+-- Update() only runs while the PDA is open, so a gap between calls means the
+-- PDA was closed and re-opened (same trick the taskboard uses). Repopulate then
+-- so status and last-seen are fresh.
+function pda_anr_tracker_tab:Update()
+    CUIScriptWnd.Update(self)
+
+    local now = time_global()
+    if (not self._last_update) or (now - self._last_update > 500) then
+        self:Populate()
+    end
+    self._last_update = now
+end
+
+--=====================================================
+-- Singleton access (what MAC calls via `func`)
+--=====================================================
+
+function get_ui()
+    if not instance then
+        instance = pda_anr_tracker_tab()
+    end
+    return instance
+end
