@@ -1,9 +1,12 @@
 # Arc's Name Replacer
-Arc' Name Replacer Version: 1.8.2
+Arc' Name Replacer Version: 1.9
 
 ## Mod Description: 
 
 This mod randomly selects non unique stalkers to give a special name taken from the names.txt file.
+
+## Requirements
+MAC (Mod app creator) https://www.moddb.com/mods/stalker-anomaly/addons/mod-app-creator-mac - required for tracker
 
 ## Installation: 
 ### Mo2:
@@ -32,6 +35,8 @@ Enable Debug Logging (bool)(default: false) - Prints the remaining names in the 
 Enable Map Markers (bool)(default: true) - Toggle to show a map marker for renamed stalkers until you meet or kill them.
 
 ## Changelog:
+
+v1.8: Added tracker renamed stalkers, tracks last seen pos, status, name and faction
 
 v1.8.2: Code cleaning and bug fixes
 
