@@ -11,7 +11,7 @@ MAC (Mod app creator) https://www.moddb.com/mods/stalker-anomaly/addons/mod-app-
 ## Installation: 
 ### Mo2:
 1. Install MAC
-2. Use Mo2 to install Arc's Name Replacer.7z
+2. Use Mo2 to install Arc's Name Replacer.7z (Load after MAC)
 3. Place names.txt in the root of your ANOMALY directory (the same place where AnomalyLauncher.exe is)
 4. Run the game
 
