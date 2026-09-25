@@ -10,14 +10,14 @@ local LAYOUT = {
     ICON     = 48,   -- portrait size (square)
 }
 
--- Optional faction patches. Format: community id -> texture name.
--- Left empty on purpose: fill in with texture names from your install and the
--- patch will draw in the top-right corner of the portrait. Example:
---   stalker = "your_stalker_patch_texture",
-local FACTION_PATCHES = {
-}
-
 local DIVIDER_COLOR = GetARGB(70, 200, 200, 200)
+
+-- base label for each sortable column; the active sort gets an arrow suffix
+local HEADER_LABELS = {
+    name = "Name",
+    status = "Status",
+    seen = "Last Seen",
+}
 
 local xml = CScriptXmlInit()
 xml:ParseFile("pda_anr_tracker.xml")
@@ -39,25 +39,8 @@ function anr_tracker_row:__init(row)
         self.portrait:SetStretchTexture(true)
     end
 
-    -- faction patch overlay: only when this stalker's community has an explicit,
-    -- non-empty entry in FACTION_PATCHES. No entry = no patch, no default.
-    local patch_tex = nil
-    if row.community then
-        local t = rawget(FACTION_PATCHES, row.community)
-        if type(t) == "string" and t ~= "" then patch_tex = t end
-    end
-    if patch_tex and self.portrait then
-        self.patch = xml:InitStatic("row_patch", self)
-        self.patch:InitTexture(patch_tex)
-        self.patch:SetStretchTexture(true)
-        printf("ANR tab: patch applied name=%s community=%s texture=%s", tostring(row.name), tostring(row.community), patch_tex)
-    end
-
     self.name = xml:InitTextWnd("row_name", self)
     self.name:SetText(row.name)
-
-    self.faction = xml:InitTextWnd("row_faction", self)
-    self.faction:SetText(row.faction_text)
 
     self.status = xml:InitTextWnd("row_status", self)
     self.status:SetText(row.status_text)
@@ -91,6 +74,8 @@ class "pda_anr_tracker_tab" (CUIScriptWnd)
 function pda_anr_tracker_tab:__init()
     super()
     self._last_update = nil
+    self.sort_key = "name" -- "name" | "status" | "seen"
+    self.sort_ascending = true
     self:InitControls()
 end
 
@@ -99,21 +84,63 @@ function pda_anr_tracker_tab:InitControls()
 
     self.frame = xml:InitStatic("frame_main", self)
     xml:InitTextWnd("title", self.frame)
-    xml:InitTextWnd("header_name", self.frame)
-    xml:InitTextWnd("header_status", self.frame)
-    xml:InitTextWnd("header_seen", self.frame)
+
+    -- headers are buttons so clicking one sorts by that column
+    self.header_name = xml:Init3tButton("header_name", self.frame)
+    self:Register(self.header_name, "header_name")
+    self:AddCallback("header_name", ui_events.BUTTON_CLICKED, self.OnHeaderName, self)
+
+    self.header_status = xml:Init3tButton("header_status", self.frame)
+    self:Register(self.header_status, "header_status")
+    self:AddCallback("header_status", ui_events.BUTTON_CLICKED, self.OnHeaderStatus, self)
+
+    self.header_seen = xml:Init3tButton("header_seen", self.frame)
+    self:Register(self.header_seen, "header_seen")
+    self:AddCallback("header_seen", ui_events.BUTTON_CLICKED, self.OnHeaderSeen, self)
 
     self.list = xml:InitListBox("tracker_list", self.frame)
     self:Register(self.list, "tracker_list")
 
     self.empty_text = xml:InitTextWnd("empty_text", self.frame)
     self.empty_text:Show(false)
+
+    self:RefreshHeaderLabels()
+end
+
+function pda_anr_tracker_tab:RefreshHeaderLabels()
+    local arrow = self.sort_ascending and "^" or "v"
+    self.header_name:TextControl():SetText(HEADER_LABELS.name .. (self.sort_key == "name" and arrow or ""))
+    self.header_status:TextControl():SetText(HEADER_LABELS.status .. (self.sort_key == "status" and arrow or ""))
+    self.header_seen:TextControl():SetText(HEADER_LABELS.seen .. (self.sort_key == "seen" and arrow or ""))
+end
+
+function pda_anr_tracker_tab:SetSort(sort_key)
+    if self.sort_key == sort_key then
+        self.sort_ascending = not self.sort_ascending
+    else
+        self.sort_key = sort_key
+        self.sort_ascending = true
+    end
+    self:RefreshHeaderLabels()
+    self:Populate()
+end
+
+function pda_anr_tracker_tab:OnHeaderName()
+    self:SetSort("name")
+end
+
+function pda_anr_tracker_tab:OnHeaderStatus()
+    self:SetSort("status")
+end
+
+function pda_anr_tracker_tab:OnHeaderSeen()
+    self:SetSort("seen")
 end
 
 function pda_anr_tracker_tab:Populate()
     self.list:RemoveAll()
 
-    local rows = arc_name_replacer_mcm.get_tracker_rows()
+    local rows = arc_name_replacer_mcm.get_tracker_rows(self.sort_key, self.sort_ascending)
     self.empty_text:Show(#rows == 0)
 
     for _, row in ipairs(rows) do
@@ -121,9 +148,6 @@ function pda_anr_tracker_tab:Populate()
     end
 end
 
--- Update() only runs while the PDA is open, so a gap between calls means the
--- PDA was closed and re-opened (same trick the taskboard uses). Repopulate then
--- so status and last-seen are fresh.
 function pda_anr_tracker_tab:Update()
     CUIScriptWnd.Update(self)
 
