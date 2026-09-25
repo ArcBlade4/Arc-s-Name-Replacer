@@ -1,5 +1,5 @@
 # Arc's Name Replacer
-Arc' Name Replacer Version: 1.9
+Arc' Name Replacer Version: 1.9.1
 
 ## Mod Description: 
 
@@ -38,7 +38,9 @@ Enable Map Markers (bool)(default: true) - Toggle to show a map marker for renam
 
 ## Changelog:
 
-v1.8: Added tracker renamed stalkers, tracks last seen pos, status, name and faction
+v1.9.1: Changed tracker works to be on LOS instead of interacting 
+
+v1.9: Added tracker renamed stalkers, tracks last seen pos, status, name and faction
 
 v1.8.2: Code cleaning and bug fixes
 
