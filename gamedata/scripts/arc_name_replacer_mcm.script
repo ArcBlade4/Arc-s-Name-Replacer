@@ -4,24 +4,27 @@
 local donator_pool = {}
 local processed_npcs = {}
 local renamed_npcs = {}
-local tracked_npcs = {} -- [npc_id] = { name=, status=, last_seen={...}, last_level= }  (never cleared)
-local last_generic_message_time = 0 -- time of the last generic (non-special) rename message
-local last_debug_time = 0 -- time of the last debug print
-local last_poll_time = 0 -- time of the last sighting poll
-local gaze_timers = {} -- [npc_id] = accumulated ms of continuous, unbroken line-of-sight
+local tracked_npcs = {}
+local assigned_names = {}
+local last_generic_message_time = 0
+local last_debug_time = 0
+local last_poll_time = 0
+local gaze_timers = {} 
 local spawn_chance = 1
 local enable_messages = false
 local file_found = false
 local is_enabled = true
 local enable_death_messages = false
-local generic_message_cooldown = 2 -- seconds between generic rename messages, from mcm
-local debug_enabled = false -- prints donator pool size + cooldown status to the log, from mcm
-local enable_map_markers = true -- whether renamed npcs get a map marker, from mcm
+local generic_message_cooldown = 2 
+local debug_enabled = false 
+local enable_map_markers = true
 local MARKER_SPOT_TYPE = "anr_special_location"
 local MARKER_HINT = "Someone special"
 local SIGHTING_DISTANCE = 10 -- metres, max distance to count as "in radius" (no line of sight needed)
-local GAZE_TIME_MS = 1000 -- ms of continuous, unbroken line of sight needed to count as "looked at"
-local SIGHTING_POLL_MS = 200 -- how often to check sightings/gaze; kept short so the gaze timer is accurate
+local GAZE_TIME_MS = 2000 -- ms of continuous, unbroken line of sight needed to count as "looked at"
+local SIGHTING_POLL_MS = 200 
+local full_recovery_done = false
+local pending_full_recovery = false
 
 --=====================================================
 -- MESSAGES AND SPECIAL NAMES
@@ -76,7 +79,6 @@ local generic_kill_messages = {
 
 --=====================================================
 -- TIME HELPERS
--- CTime objects don't serialize, so store them as plain tables.
 --=====================================================
 
 local function ctime_to_table(t)
@@ -101,8 +103,6 @@ local function time_ago(tb)
     return math.floor(hours / 24) .. "d " .. game.translate_string("ui_anr_tracker_ago")
 end
 
--- numeric seconds since last_seen, for sorting by recency. "Never seen" sorts as
--- oldest (math.huge) rather than as if it just happened.
 local function seconds_since(tb)
     if not tb then return math.huge end
     return game.get_game_time():diffSec(ctime_from_table(tb))
@@ -110,7 +110,6 @@ end
 
 --=====================================================
 -- LEVEL NAMES
--- Turns internal ids (k00_marsh) into display names (Great Swamps).
 -- Add entries here for extra maps from other mods.
 --=====================================================
 
@@ -155,10 +154,12 @@ local function level_display_name(id)
 end
 
 --=====================================================
--- TRACKER (persistent record of renamed stalkers the player has met)
+-- TRACKER
 --=====================================================
 
-local remove_marker -- forward declaration; defined below in MAP MARKERS, used here in actor_on_update
+local remove_marker
+
+local recover_all_renamed_stalkers
 
 local function stamp_seen(entry)
     entry.last_seen = ctime_to_table(game.get_game_time())
@@ -192,9 +193,6 @@ local function refresh_status(id, e)
     end
 end
 
--- true if obj counts as "seen" right now: either within SIGHTING_DISTANCE (no line
--- of sight needed), or in unbroken line of sight for at least GAZE_TIME_MS.
--- dt is the real time (ms) since the last poll, used to accumulate gaze time.
 local function check_sighting(id, obj, dt)
     if not (obj and obj:alive()) then
         gaze_timers[id] = 0
@@ -212,16 +210,16 @@ local function check_sighting(id, obj, dt)
     return in_radius or gaze_timers[id] >= GAZE_TIME_MS
 end
 
--- throttled poll:
---   - refreshes "last seen" for npcs already in the tracker
---   - promotes renamed-but-unmet npcs into the tracker
--- both using the same rule: in radius, or looked at continuously for GAZE_TIME_MS.
 local function actor_on_update()
     local now = time_global()
     if now < last_poll_time + SIGHTING_POLL_MS then return end
     local dt = now - last_poll_time
     last_poll_time = now
-
+	if pending_full_recovery then
+        pending_full_recovery = false
+        recover_all_renamed_stalkers()
+        full_recovery_done = true
+    end
     for id, e in pairs(tracked_npcs) do
         if e.status == "alive" then
             local obj = level.object_by_id(id)
@@ -273,7 +271,6 @@ local function refresh_markers()
     end
 end
 
--- Player talked to a renamed NPC -> track them and drop their marker
 local function npc_on_use(npc, who)
     local data = npc and renamed_npcs[npc:name()]
     if data then
@@ -345,6 +342,7 @@ local function take_random_name()
     local idx = math.random(#donator_pool)
     local chosen_name = donator_pool[idx]
     table.remove(donator_pool, idx)
+    assigned_names[chosen_name] = true -- so recover_all_renamed_stalkers() can recognise this name later
     return chosen_name
 end
 
@@ -402,8 +400,10 @@ local function save_state(m_data)
     m_data.ANR_processed_npcs = processed_npcs
     m_data.ANR_renamed_npcs = renamed_npcs
     m_data.ANR_tracked_npcs = tracked_npcs
+    m_data.ANR_assigned_names = assigned_names
     m_data.ANR_names_loaded = file_found
     m_data.ANR_last_generic_message_time = last_generic_message_time
+    m_data.ANR_full_recovery_done = full_recovery_done
 end
 
 local function load_state(m_data)
@@ -411,8 +411,10 @@ local function load_state(m_data)
     processed_npcs = m_data.ANR_processed_npcs or processed_npcs
     renamed_npcs = m_data.ANR_renamed_npcs or renamed_npcs
     tracked_npcs = m_data.ANR_tracked_npcs or tracked_npcs
+    assigned_names = m_data.ANR_assigned_names or assigned_names
     file_found = m_data.ANR_names_loaded or file_found
     last_generic_message_time = m_data.ANR_last_generic_message_time or last_generic_message_time
+    full_recovery_done = m_data.ANR_full_recovery_done or full_recovery_done
 end
 
 --=====================================================
@@ -480,8 +482,7 @@ local function on_npc_killed(victim, who)
     local data = renamed_npcs[victim:name()]
     local tracked = tracked_npcs[id]
 
-    -- ignore anyone who was never renamed and never tracked.
-    -- (tracked covers npcs the player already talked to, whose renamed_npcs entry is gone)
+   
     if not data and not tracked then return end
 
     local chosen_name = (data and data.chosen_name) or tracked.name
@@ -490,9 +491,7 @@ local function on_npc_killed(victim, who)
     remove_marker(id)
     renamed_npcs[victim:name()] = nil
 
-    -- Tracker rules: a renamed stalker only enters the tracker if the player has
-    -- met them already (existing entry) or killed them personally. Deaths of
-    -- stalkers the player never interacted with are NOT added.
+    
     if by_player then
         track(victim, chosen_name) -- creates the entry if needed and stamps last seen
     end
@@ -502,7 +501,7 @@ local function on_npc_killed(victim, who)
         entry.status = by_player and "killed_by_player" or "dead"
     end
 
-    -- the tracker update above happens before these early returns, so it works with alerts off
+    
     if not enable_death_messages then return end
     if not by_player then return end
 
@@ -541,6 +540,71 @@ end
 --=====================================================
 -- SCANNER LOOP
 --=====================================================
+
+
+local function rebuild_assigned_names_from_pool()
+    local engine_root_path = getFS():update_path("$fs_root$", "")
+    local file_path = engine_root_path .. "names.txt"
+    local file = io.open(file_path, "r")
+    if not file then
+        printf("ANR: WARNING! Could not reopen names.txt to rebuild assigned_names for recovery.")
+        return
+    end
+
+    local in_pool = {}
+    for _, name in ipairs(donator_pool) do
+        in_pool[name] = true
+    end
+
+    local added = 0
+    for line in file:lines() do
+        local clean_name = line:gsub("^%s*(.-)%s*$", "%1")
+        if clean_name ~= "" and not in_pool[clean_name] and not assigned_names[clean_name] then
+            assigned_names[clean_name] = true
+            added = added + 1
+        end
+    end
+    file:close()
+    printf("ANR: Rebuilt assigned_names from names.txt, marked " .. added .. " previously-used name(s) as assigned.")
+end
+
+function recover_all_renamed_stalkers()
+    rebuild_assigned_names_from_pool()
+    local recovered = 0
+    for id = 1, 65534 do
+		
+        if not tracked_npcs[id] then
+            local se_obj = alife_object(id)
+            if se_obj and se_obj.character_name and se_obj.section_name then
+                local ok_profile, profile = pcall(se_obj.section_name, se_obj)
+                if ok_profile and profile and is_generic_profile(profile) then
+                    local ok_name, current_name = pcall(se_obj.character_name, se_obj)
+                    if ok_name and current_name and assigned_names[current_name] then
+                        local ok_alive, alive = pcall(se_obj.alive, se_obj)
+
+                        local entry = {
+                            name = current_name,
+                            status = (ok_alive and not alive) and "dead" or "alive",
+                        }
+
+                        -- pull portrait + faction straight from the offline object, same
+                        -- fields store_identity() reads from an online npc, so recovered
+                        -- stalkers get a portrait without the player having to see them again
+                        local ok_icon, icon = pcall(se_obj.character_icon, se_obj)
+                        if ok_icon and icon and icon ~= "" then entry.icon = icon end
+
+                        local ok_community, community = pcall(se_obj.character_community, se_obj)
+                        if ok_community and community and community ~= "" then entry.community = community end
+
+                        tracked_npcs[id] = entry
+                        recovered = recovered + 1
+                    end
+                end
+            end
+        end
+    end
+    printf("ANR: Recovery scan complete, added " .. recovered .. " previously-renamed stalker(s) to the tracker.")
+end
 
 local function on_npc_spawn(npc)
     if not is_enabled then return end
@@ -649,8 +713,6 @@ function on_game_start()
     RegisterScriptCallback("load_state", load_state)
 	RegisterScriptCallback("npc_on_use", npc_on_use)
     RegisterScriptCallback("actor_on_update", actor_on_update)
-    -- PDA tab through Mod App Creator (same framework iTheon's Taskboard uses).
-    -- The tracker is only reachable through this PDA tab, so Mod App Creator is required.
     if mac_mcm and mac_mcm.add_app then
         mac_mcm.add_app("anr_tracker", {
             name = "ui_anr_tracker_title",
@@ -661,6 +723,7 @@ function on_game_start()
     end
     load_settings()
     ensure_names_loaded()
+	pending_full_recovery = not full_recovery_done
 	refresh_markers()
 	math.randomseed(os.time())
 	last_poll_time = time_global()
