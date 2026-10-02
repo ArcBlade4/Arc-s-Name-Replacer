@@ -10,7 +10,37 @@ local LAYOUT = {
     ICON     = 48,   -- portrait size (square)
 }
 
+
+local ANR_exc_key_btns = {
+    [DIK_keys.DIK_LSHIFT] = true,
+    [DIK_keys.DIK_RSHIFT] = true,
+}
+
+local FACTION_PATCHES = {
+}
+
 local DIVIDER_COLOR = GetARGB(70, 200, 200, 200)
+local SEARCH_OUTLINE_COLOR = GetARGB(180, 150, 150, 150)
+
+
+local function attach_bar(parent, x1, y1, x2, y2, color)
+    local bar = CUIStatic()
+    bar:SetAutoDelete(true)
+    bar:SetWndRect(Frect():set(x1, y1, x2, y2))
+    bar:InitTexture("ui\\ui_noise")
+    bar:SetStretchTexture(true)
+    bar:SetTextureColor(color)
+    parent:AttachChild(bar)
+    return bar
+end
+
+
+local function attach_outline(parent, x, y, w, h, color)
+    attach_bar(parent, x - 1, y - 1, x + w + 1, y,     color) -- top
+    attach_bar(parent, x - 1, y + h, x + w + 1, y + h + 1, color) -- bottom
+    attach_bar(parent, x - 1, y - 1, x,     y + h + 1, color) -- left
+    attach_bar(parent, x + w, y - 1, x + w + 1, y + h + 1, color) -- right
+end
 
 -- base label for each sortable column; the active sort gets an arrow suffix
 local HEADER_LABELS = {
@@ -39,13 +69,33 @@ function anr_tracker_row:__init(row)
         self.portrait:SetStretchTexture(true)
     end
 
+    -- faction patch overlay: only when this stalker's community has an explicit,
+    -- non-empty entry in FACTION_PATCHES. No entry = no patch, no default.
+    local patch_tex = nil
+    if row.community then
+        local t = rawget(FACTION_PATCHES, row.community)
+        if type(t) == "string" and t ~= "" then patch_tex = t end
+    end
+    if patch_tex and self.portrait then
+        self.patch = xml:InitStatic("row_patch", self)
+        self.patch:InitTexture(patch_tex)
+        self.patch:SetStretchTexture(true)
+        printf("ANR tab: patch applied name=%s community=%s texture=%s", tostring(row.name), tostring(row.community), patch_tex)
+    end
+
     self.name = xml:InitTextWnd("row_name", self)
     self.name:SetText(row.name)
+
+    self.faction = xml:InitTextWnd("row_faction", self)
+    self.faction:SetText(row.faction_text)
 
     self.status = xml:InitTextWnd("row_status", self)
     self.status:SetText(row.status_text)
     local c = row.color
     self.status:SetTextColor(GetARGB(c[1], c[2], c[3], c[4]))
+
+    self.rank = xml:InitTextWnd("row_rank", self)
+    self.rank:SetText(row.rank_text)
 
     self.seen = xml:InitTextWnd("row_seen", self)
     self.seen:SetText(row.seen_text)
@@ -74,8 +124,13 @@ class "pda_anr_tracker_tab" (CUIScriptWnd)
 function pda_anr_tracker_tab:__init()
     super()
     self._last_update = nil
+    self._pending_search = false
+    self._search_changed_at = nil
     self.sort_key = "name" -- "name" | "status" | "seen"
     self.sort_ascending = true
+    self.search_text = ""
+    self.locked = false    -- search box armed/disarmed state
+    self.removelet = false -- pending "doubled capital letter" fixup
     self:InitControls()
 end
 
@@ -85,7 +140,20 @@ function pda_anr_tracker_tab:InitControls()
     self.frame = xml:InitStatic("frame_main", self)
     xml:InitTextWnd("title", self.frame)
 
-    -- headers are buttons so clicking one sorts by that column
+    self.search_box = xml:InitEditBox("search_box", self.frame)
+    self:Register(self.search_box, "search_box")
+
+    self.search_lock_btn = xml:Init3tButton("search_lock_btn", self.frame)
+    self:Register(self.search_lock_btn, "search_lock_btn")
+    self:AddCallback("search_lock_btn", ui_events.BUTTON_CLICKED, self.OnClickSearchLock, self)
+
+
+    attach_outline(self.frame, 390, 10, 210, 24, SEARCH_OUTLINE_COLOR)
+
+ 
+    self.search_placeholder = xml:InitTextWnd("search_placeholder", self.frame)
+
+ 
     self.header_name = xml:Init3tButton("header_name", self.frame)
     self:Register(self.header_name, "header_name")
     self:AddCallback("header_name", ui_events.BUTTON_CLICKED, self.OnHeaderName, self)
@@ -108,7 +176,7 @@ function pda_anr_tracker_tab:InitControls()
 end
 
 function pda_anr_tracker_tab:RefreshHeaderLabels()
-    local arrow = self.sort_ascending and "^" or "v"
+    local arrow = self.sort_ascending and " ^" or " v"
     self.header_name:TextControl():SetText(HEADER_LABELS.name .. (self.sort_key == "name" and arrow or ""))
     self.header_status:TextControl():SetText(HEADER_LABELS.status .. (self.sort_key == "status" and arrow or ""))
     self.header_seen:TextControl():SetText(HEADER_LABELS.seen .. (self.sort_key == "seen" and arrow or ""))
@@ -137,10 +205,127 @@ function pda_anr_tracker_tab:OnHeaderSeen()
     self:SetSort("seen")
 end
 
+--=====================================================
+-- Search box arm/disarm
+--=====================================================
+
+function pda_anr_tracker_tab:ArmSearch()
+    if self.locked then return end
+    self.locked = true
+    self.search_box:CaptureFocus(true)
+end
+
+function pda_anr_tracker_tab:DisarmSearch()
+    if not self.locked then return end
+    self.locked = false
+    self.removelet = false
+    self.search_box:CaptureFocus(false)
+    RemoveTimeEvent("anr_delay_input_unlock", "anr_delay_input_unlock")
+end
+
+function pda_anr_tracker_tab:OnClickSearchLock()
+    if self.locked then
+        self:DisarmSearch()
+    else
+        self:ArmSearch()
+    end
+end
+
+local function anr_block_input()
+    CreateTimeEvent("anr_delay_input_unlock", "anr_delay_input_unlock", 0.01, function()
+        level.disable_input()
+        level.enable_input()
+    end)
+end
+
+local function anr_search_active()
+    if not (instance and instance.locked) then return false end
+    if not get_console_cmd(1, "g_3d_pda") then return false end
+    local pda = ActorMenu.get_pda_menu()
+    return pda:IsShown() and pda:GetActiveSection() == "eptAnrTracker"
+end
+
+-- fires BEFORE the engine processes the key
+function on_before_key_press(key, action, dis, flags)
+    if not instance then return end
+    if not get_console_cmd(1, "g_3d_pda") then return end
+
+    local pda = ActorMenu.get_pda_menu()
+    if pda:GetActiveSection() ~= "eptAnrTracker" then return end
+
+    if not instance.locked then
+        instance.search_box:CaptureFocus(false)
+        RemoveTimeEvent("anr_delay_input_unlock", "anr_delay_input_unlock")
+        return
+    end
+
+
+    if key == DIK_keys.DIK_ESCAPE or key == DIK_keys.DIK_RETURN or key == DIK_keys.DIK_NUMPADENTER then
+        instance:DisarmSearch()
+        if flags then flags.ret_value = false end
+        return
+    end
+
+    anr_block_input()
+
+    if instance.removelet then -- roundway to fix doubling of capital letters
+        instance.removelet = false
+        local text = instance.search_box:GetText() or ""
+        if #text > 0 then
+            instance.search_box:SetText(string.sub(text, 1, -2))
+        end
+    end
+
+    if ANR_exc_key_btns[key] then
+        instance.removelet = true
+    end
+
+    -- block everything (PDA close, holster, lean, sprint, etc.)
+    if flags then flags.ret_value = false end
+end
+
+local anr_on_key_release_original = bind_stalker_ext.on_key_release
+function bind_stalker_ext.on_key_release(binder, key)
+    if anr_search_active() then return false end
+    return anr_on_key_release_original(binder, key)
+end
+
+function on_before_save_input(flags)
+    if anr_search_active() and flags then flags.ret = true end
+end
+
+-- drop the lock if the player leaves the tab or closes the PDA while armed
+function anr_on_update()
+    if instance and instance.locked then
+        local pda = ActorMenu.get_pda_menu()
+        if not (pda:IsShown() and pda:GetActiveSection() == "eptAnrTracker") then
+            instance:DisarmSearch()
+        end
+    end
+end
+
+function on_game_start()
+    RegisterScriptCallback("on_before_key_press", on_before_key_press)
+    RegisterScriptCallback("on_before_save_input", on_before_save_input)
+    RegisterScriptCallback("actor_on_update", anr_on_update)
+end
+
 function pda_anr_tracker_tab:Populate()
     self.list:RemoveAll()
 
     local rows = arc_name_replacer_mcm.get_tracker_rows(self.sort_key, self.sort_ascending)
+
+    if self.search_text ~= "" then
+        local needle = self.search_text:lower()
+        local filtered = {}
+        for _, row in ipairs(rows) do
+            if row.name:lower():find(needle, 1, true) then
+                table.insert(filtered, row)
+            end
+        end
+        rows = filtered
+    end
+
     self.empty_text:Show(#rows == 0)
 
     for _, row in ipairs(rows) do
@@ -148,10 +333,35 @@ function pda_anr_tracker_tab:Populate()
     end
 end
 
+
+local SEARCH_DEBOUNCE_MS = 200
+
 function pda_anr_tracker_tab:Update()
     CUIScriptWnd.Update(self)
+	
+    local current_search = self.search_box:GetText() or ""
+
+    self.search_placeholder:Show(current_search == "")
 
     local now = time_global()
+
+    if current_search ~= self.search_text then
+        -- text changed: remember it, but don't rebuild the list yet
+        self.search_text = current_search
+        self._pending_search = true
+        self._search_changed_at = now
+        return
+    end
+
+    if self._pending_search then
+        if now - self._search_changed_at > SEARCH_DEBOUNCE_MS then
+            self._pending_search = false
+            self:Populate()
+            self._last_update = now
+        end
+        return
+    end
+
     if (not self._last_update) or (now - self._last_update > 500) then
         self:Populate()
     end
@@ -159,7 +369,7 @@ function pda_anr_tracker_tab:Update()
 end
 
 --=====================================================
--- Singleton access (what MAC calls via `func`)
+-- Singleton access
 --=====================================================
 
 function get_ui()

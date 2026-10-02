@@ -166,12 +166,22 @@ local function stamp_seen(entry)
     entry.last_level = level.name()
 end
 
--- portrait + faction, saved so they still show when the npc is offline/dead
+local function get_npc_rank(npc)
+    if not npc or not ranks or not ranks.get_obj_rank_name then return nil end
+    local ok, rank = pcall(ranks.get_obj_rank_name, npc)
+    if ok and rank and rank ~= "" then return rank end
+    return nil
+end
+
+
 local function store_identity(entry, npc)
     local icon = npc:character_icon()
     local community = npc:character_community()
     if icon and icon ~= "" then entry.icon = icon end
     if community and community ~= "" then entry.community = community end
+
+    local rank = get_npc_rank(npc)
+    if rank then entry.rank = rank end
 end
 
 -- creates the entry if needed and stamps it
@@ -225,7 +235,7 @@ local function actor_on_update()
             local obj = level.object_by_id(id)
             if check_sighting(id, obj, dt) then
                 stamp_seen(e)
-                if not e.icon then store_identity(e, obj) end
+                store_identity(e, obj) -- icon/community fill in once, rank refreshes every sighting
             end
         end
     end
@@ -586,10 +596,6 @@ function recover_all_renamed_stalkers()
                             name = current_name,
                             status = (ok_alive and not alive) and "dead" or "alive",
                         }
-
-                        -- pull portrait + faction straight from the offline object, same
-                        -- fields store_identity() reads from an online npc, so recovered
-                        -- stalkers get a portrait without the player having to see them again
                         local ok_icon, icon = pcall(se_obj.character_icon, se_obj)
                         if ok_icon and icon and icon ~= "" then entry.icon = icon end
 
@@ -665,6 +671,7 @@ function get_tracker_rows(sort_key, ascending)
             faction_text = e.community and game.translate_string(e.community) or "",
             status = e.status or "alive", -- raw key, for sorting
             status_text = game.translate_string(STATUS_KEYS[e.status] or "ui_anr_tracker_alive"),
+            rank_text = e.rank and game.translate_string(e.rank) or "",
             color = STATUS_COLORS[e.status] or STATUS_COLORS.alive,
             seen_secs = seconds_since(e.last_seen), -- raw value, for sorting
             seen_text = time_ago(e.last_seen),
@@ -713,6 +720,7 @@ function on_game_start()
     RegisterScriptCallback("load_state", load_state)
 	RegisterScriptCallback("npc_on_use", npc_on_use)
     RegisterScriptCallback("actor_on_update", actor_on_update)
+	RegisterScriptCallback("on_key_press", ui_pda_anr_tracker_tab.on_before_key_press)
     if mac_mcm and mac_mcm.add_app then
         mac_mcm.add_app("anr_tracker", {
             name = "ui_anr_tracker_title",

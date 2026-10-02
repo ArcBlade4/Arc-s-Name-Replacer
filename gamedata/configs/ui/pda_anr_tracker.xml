@@ -5,6 +5,19 @@
 	<title x="20" y="10" width="780" height="24">
 		<text font="letterica18" align="l" r="230" g="230" b="230">ui_anr_tracker_title</text>
 	</title>
+	
+	<search_box x="390" y="10" width="210" height="24">
+		<text font="letterica16" align="l" vert_align="c" r="230" g="230" b="230"/>
+	</search_box>
+
+	<search_placeholder x="396" y="10" width="200" height="24">
+		<text font="letterica16" align="l" vert_align="c" r="140" g="140" b="140">Search...</text>
+	</search_placeholder>
+
+	<search_lock_btn x="610" y="7" width="90" height="28" check_mode="0">
+		<text font="letterica16">ui_anr_tracker_lock_btn</text>
+		<texture>ui_inter_pda_btn</texture>
+	</search_lock_btn>
 
 
 	<header_name x="82" y="44" width="230" height="20">
@@ -37,7 +50,9 @@
 	<row_status x="310" y="0" width="140" height="58">
 		<text font="letterica16" align="l" vert_align="c" r="220" g="220" b="220"/>
 	</row_status>
-
+	<row_rank x="310" y="30" width="140" height="18">
+		<text font="letterica16" align="l" vert_align="c" r="140" g="140" b="140"/>
+	</row_rank>
 	<row_seen x="470" y="8" width="300" height="20">
 		<text font="letterica16" align="l" vert_align="c" r="220" g="220" b="220"/>
 	</row_seen>

@@ -50,6 +50,9 @@
     </string>
 
     <!-- Tracker window -->
+	<string id="ui_anr_tracker_lock_btn">
+        <text>Enable Typing</text>
+    </string>
     <string id="ui_anr_tracker_title">
         <text>Tracker</text>
     </string>
