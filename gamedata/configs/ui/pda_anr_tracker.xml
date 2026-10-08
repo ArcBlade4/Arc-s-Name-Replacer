@@ -18,6 +18,11 @@
 		<text font="letterica16">ui_anr_tracker_lock_btn</text>
 		<texture>ui_inter_pda_btn</texture>
 	</search_lock_btn>
+	
+		<recover_btn x="290" y="7" width="90" height="28" check_mode="0">
+		<text font="letterica16">ui_anr_tracker_recover_btn</text>
+		<texture>ui_inter_pda_btn</texture>
+	</recover_btn>
 
 
 	<header_name x="82" y="44" width="230" height="20">

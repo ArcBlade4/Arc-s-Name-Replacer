@@ -146,6 +146,10 @@ function pda_anr_tracker_tab:InitControls()
     self.search_lock_btn = xml:Init3tButton("search_lock_btn", self.frame)
     self:Register(self.search_lock_btn, "search_lock_btn")
     self:AddCallback("search_lock_btn", ui_events.BUTTON_CLICKED, self.OnClickSearchLock, self)
+	
+	self.recover_btn = xml:Init3tButton("recover_btn", self.frame)
+    self:Register(self.recover_btn, "recover_btn")
+    self:AddCallback("recover_btn", ui_events.BUTTON_CLICKED, self.OnClickRecover, self)
 
 
     attach_outline(self.frame, 390, 10, 210, 24, SEARCH_OUTLINE_COLOR)
@@ -230,6 +234,8 @@ function pda_anr_tracker_tab:OnClickSearchLock()
         self:ArmSearch()
     end
 end
+
+
 
 local function anr_block_input()
     CreateTimeEvent("anr_delay_input_unlock", "anr_delay_input_unlock", 0.01, function()
@@ -367,6 +373,19 @@ function pda_anr_tracker_tab:Update()
     end
     self._last_update = now
 end
+
+--=====================================================
+-- Refresh Button
+--=====================================================
+
+function pda_anr_tracker_tab:OnClickRecover()
+    self:DisarmSearch() -- make sure the search box isn't holding input
+    local added = arc_name_replacer_mcm.manual_recovery()
+    printf("ANR tab: manual recovery added %s stalker(s)", tostring(added))
+    self:Populate()
+end
+
+
 
 --=====================================================
 -- Singleton access

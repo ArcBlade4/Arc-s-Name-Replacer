@@ -23,8 +23,6 @@ local MARKER_HINT = "Someone special"
 local SIGHTING_DISTANCE = 10 -- metres, max distance to count as "in radius" (no line of sight needed)
 local GAZE_TIME_MS = 2000 -- ms of continuous, unbroken line of sight needed to count as "looked at"
 local SIGHTING_POLL_MS = 200 
-local full_recovery_done = false
-local pending_full_recovery = false
 
 --=====================================================
 -- MESSAGES AND SPECIAL NAMES
@@ -225,11 +223,6 @@ local function actor_on_update()
     if now < last_poll_time + SIGHTING_POLL_MS then return end
     local dt = now - last_poll_time
     last_poll_time = now
-	if pending_full_recovery then
-        pending_full_recovery = false
-        recover_all_renamed_stalkers()
-        full_recovery_done = true
-    end
     for id, e in pairs(tracked_npcs) do
         if e.status == "alive" then
             local obj = level.object_by_id(id)
@@ -352,7 +345,7 @@ local function take_random_name()
     local idx = math.random(#donator_pool)
     local chosen_name = donator_pool[idx]
     table.remove(donator_pool, idx)
-    assigned_names[chosen_name] = true -- so recover_all_renamed_stalkers() can recognise this name later
+    assigned_names[chosen_name] = true
     return chosen_name
 end
 
@@ -413,7 +406,6 @@ local function save_state(m_data)
     m_data.ANR_assigned_names = assigned_names
     m_data.ANR_names_loaded = file_found
     m_data.ANR_last_generic_message_time = last_generic_message_time
-    m_data.ANR_full_recovery_done = full_recovery_done
 end
 
 local function load_state(m_data)
@@ -424,7 +416,6 @@ local function load_state(m_data)
     assigned_names = m_data.ANR_assigned_names or assigned_names
     file_found = m_data.ANR_names_loaded or file_found
     last_generic_message_time = m_data.ANR_last_generic_message_time or last_generic_message_time
-    full_recovery_done = m_data.ANR_full_recovery_done or full_recovery_done
 end
 
 --=====================================================
@@ -610,6 +601,11 @@ function recover_all_renamed_stalkers()
         end
     end
     printf("ANR: Recovery scan complete, added " .. recovered .. " previously-renamed stalker(s) to the tracker.")
+	return recovered
+end
+
+function manual_recovery()
+    return recover_all_renamed_stalkers()
 end
 
 local function on_npc_spawn(npc)
@@ -731,7 +727,6 @@ function on_game_start()
     end
     load_settings()
     ensure_names_loaded()
-	pending_full_recovery = not full_recovery_done
 	refresh_markers()
 	math.randomseed(os.time())
 	last_poll_time = time_global()
