@@ -23,6 +23,7 @@ local MARKER_HINT = "Someone special"
 local SIGHTING_DISTANCE = 10 -- metres, max distance to count as "in radius" (no line of sight needed)
 local GAZE_TIME_MS = 2000 -- ms of continuous, unbroken line of sight needed to count as "looked at"
 local SIGHTING_POLL_MS = 200 
+local known_names = nil
 
 --=====================================================
 -- MESSAGES AND SPECIAL NAMES
@@ -302,32 +303,55 @@ local generic_patterns = {
 }
 
 -- load names
-local function load_names()
+local function sync_names()
     local engine_root_path = getFS():update_path("$fs_root$", "")
     local file_path = engine_root_path .. "names.txt"
     local file = io.open(file_path, "r")
+    if not file then
+        printf("ANR: WARNING! names.txt not found. looked here: " .. tostring(file_path))
+        return
+    end
 
-    if file then
-        printf("ANR: Found names.txt, loading names...")
-        for line in file:lines() do
-            local clean_name = line:gsub("^%s*(.-)%s*$", "%1")
-            if clean_name ~= "" then
-                table.insert(donator_pool, clean_name)
+    local file_names = {}
+    for line in file:lines() do
+        local clean_name = line:gsub("^%s*(.-)%s*$", "%1")
+        if clean_name ~= "" then
+            table.insert(file_names, clean_name)
+        end
+    end
+    file:close()
+
+    local in_pool = {}
+    for _, name in ipairs(donator_pool) do in_pool[name] = true end
+
+    local added = 0
+
+    if known_names == nil then
+        known_names = {}
+        if file_found then
+            for _, name in ipairs(file_names) do
+                known_names[name] = true
+                if not in_pool[name] then assigned_names[name] = true end
+            end
+            printf("ANR: Migrated old save, marked " .. #file_names .. " existing name(s) as known.")
+            return
+        end
+    end
+
+    -- new game, or names added to the file since this save last looked
+    for _, name in ipairs(file_names) do
+        if not known_names[name] then
+            known_names[name] = true
+            if not in_pool[name] and not assigned_names[name] then
+                table.insert(donator_pool, name)
+                in_pool[name] = true
+                added = added + 1
             end
         end
-        file:close()
-        printf("ANR: Successfully loaded " .. #donator_pool .. " names from text file.")
-        file_found = true
-    else
-        printf("ANR: WARNING! names.txt not found. looked here: " .. tostring(file_path))
     end
-end
 
--- makes name load once
-local function ensure_names_loaded()
-    if not file_found then
-        load_names()
-    end
+    file_found = true
+    printf("ANR: names.txt synced, added " .. added .. " new name(s), pool size is now " .. #donator_pool)
 end
 
 -- checks profile name against the generic patterns list
@@ -347,6 +371,10 @@ local function take_random_name()
     table.remove(donator_pool, idx)
     assigned_names[chosen_name] = true
     return chosen_name
+end
+
+local function actor_on_first_update()
+    sync_names()
 end
 
 --=====================================================
@@ -406,6 +434,7 @@ local function save_state(m_data)
     m_data.ANR_assigned_names = assigned_names
     m_data.ANR_names_loaded = file_found
     m_data.ANR_last_generic_message_time = last_generic_message_time
+	m_data.ANR_known_names = known_names
 end
 
 local function load_state(m_data)
@@ -416,6 +445,7 @@ local function load_state(m_data)
     assigned_names = m_data.ANR_assigned_names or assigned_names
     file_found = m_data.ANR_names_loaded or file_found
     last_generic_message_time = m_data.ANR_last_generic_message_time or last_generic_message_time
+	known_names = m_data.ANR_known_names
 end
 
 --=====================================================
@@ -446,7 +476,6 @@ end
 
 -- does the actual rename roll + rename for one npc
 local function try_rename_npc(npc)
-    -- safety net: never rename an npc that already has a name from us
     if renamed_npcs[npc:name()] then return end
 
     local profile = npc:profile_name() or ""
@@ -717,6 +746,7 @@ function on_game_start()
 	RegisterScriptCallback("npc_on_use", npc_on_use)
     RegisterScriptCallback("actor_on_update", actor_on_update)
 	RegisterScriptCallback("on_key_press", ui_pda_anr_tracker_tab.on_before_key_press)
+	RegisterScriptCallback("actor_on_first_update", actor_on_first_update)
     if mac_mcm and mac_mcm.add_app then
         mac_mcm.add_app("anr_tracker", {
             name = "ui_anr_tracker_title",
@@ -726,7 +756,6 @@ function on_game_start()
         })
     end
     load_settings()
-    ensure_names_loaded()
 	refresh_markers()
 	math.randomseed(os.time())
 	last_poll_time = time_global()
