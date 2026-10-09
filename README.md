@@ -1,5 +1,5 @@
 # Arc's Name Replacer
-Arc' Name Replacer Version: 1.9.3
+Arc' Name Replacer Version: 1.9.4
 
 ## Mod Description: 
 
@@ -37,6 +37,8 @@ Enable Debug Logging (bool)(default: false) - Prints the remaining names in the 
 Enable Map Markers (bool)(default: true) - Toggle to show a map marker for renamed stalkers until you meet or kill them.
 
 ## Changelog:
+
+v1.9.4: Changed name pool loading to allow for more names to be added mid save
 
 v1.9.3: Deferred profile recovery to button in tracker and added search bar 
 
