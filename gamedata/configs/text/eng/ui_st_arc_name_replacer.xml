@@ -48,6 +48,13 @@
     <string id="ui_mcm_arc_name_replacer_enable_map_markers_desc">
         <text>Toggle to show a map marker for renamed stalkers until you meet or kill them.</text>
     </string>
+	
+	<string id="ui_mcm_arc_name_replacer_reset_name_pool">
+		<text>Reset name pool</text>
+	</string>
+	<string id="ui_mcm_arc_name_replacer_reset_name_pool_desc">
+		<text>Rebuilds the name pool from names.txt, excluding names already used by stalkers in this save.</text>
+	</string>
 
     <!-- Tracker window -->
 	<string id="ui_anr_tracker_lock_btn">
