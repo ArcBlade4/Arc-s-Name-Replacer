@@ -36,7 +36,7 @@ Enable Debug Logging (bool)(default: false) - Prints the remaining names in the 
 
 Enable Map Markers (bool)(default: true) - Toggle to show a map marker for renamed stalkers until you meet or kill them.
 
-Reset name pool: (bool)(default: false) - Rebuilds the name pool from names.txt, excluding names already used by stalkers in this save. Acts like a button and will reset to false on completion
+Reset name pool: (bool)(default: false) - Rebuilds the name pool from names.txt, excluding names already used by stalkers in this save. Acts like a button and will reset to false on completion.
 
 ## Changelog:
 
