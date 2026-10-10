@@ -1,5 +1,5 @@
 # Arc's Name Replacer
-Arc' Name Replacer Version: 1.9.4
+Arc' Name Replacer Version: 1.9.5
 
 ## Mod Description: 
 
@@ -36,7 +36,11 @@ Enable Debug Logging (bool)(default: false) - Prints the remaining names in the 
 
 Enable Map Markers (bool)(default: true) - Toggle to show a map marker for renamed stalkers until you meet or kill them.
 
+Reset name pool: (bool)(default: false) - Rebuilds the name pool from names.txt, excluding names already used by stalkers in this save. Acts like a button and will reset to false on completion
+
 ## Changelog:
+
+v1.9.5: Added way to manually refresh names pool
 
 v1.9.4: Changed name pool loading to allow for more names to be added mid save
 
