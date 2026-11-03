@@ -407,9 +407,9 @@ local function take_random_name()
     assigned_names[chosen_name] = true
     return chosen_name
 end
-local function initial_spawn()
+llocal function initial_spawn()
     if initial_spawn_done then return end
-    initial_spawn_done = true -- set first so a mid-spawn error can't make it repeat
+    initial_spawn_done = true
 
     if not (file_found and #donator_pool > 0) then
         printf("ANR: initial spawn skipped, no names available.")
@@ -440,11 +440,8 @@ local function initial_spawn()
                             ok_c, community = pcall(se_obj.community, se_obj)
                         end
 
-                        if not is_faction_allowed(ok_c and community or nil) then
-                            processed_npcs[obj_name] = true
-                        else
+                        if is_faction_allowed(ok_c and community or nil) then
                             checked = checked + 1
-                            processed_npcs[obj_name] = true
 
                             if math.random() * 100 <= initial_spawn_chance then
                                 local chosen_name = take_random_name()
