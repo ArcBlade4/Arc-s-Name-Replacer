@@ -407,7 +407,7 @@ local function take_random_name()
     assigned_names[chosen_name] = true
     return chosen_name
 end
-llocal function initial_spawn()
+local function initial_spawn()
     if initial_spawn_done then return end
     initial_spawn_done = true
 
