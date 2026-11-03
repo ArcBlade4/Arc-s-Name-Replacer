@@ -26,6 +26,8 @@ local SIGHTING_POLL_MS = 200
 local known_names = nil
 local last_reset_flag = false
 local reset_flag_now = false
+local initial_sweep_chance = 1
+local initial_spawn_done = false
 --=====================================================
 -- MESSAGES AND SPECIAL NAMES
 --=====================================================
@@ -40,6 +42,10 @@ local special_messages = {
 	["PsysuckerFucker"] = "%c[255,72,155,232]Arc: %c[default]\\nWell, you've got a chance at revenge now...",
     ["Veno"] = "%c[255,72,155,232]Arc: %c[default]\\nSo, a doppelganger just showed up...",
 	["PaeleSaint"] = "%c[255,72,155,232]Arc: %c[default]\\nWatch out, there's a zealous fanatic wandering amongst us!",
+	["DaimeneX"] = "%c[255,72,155,232]Arc: %c[default]\\nThe idea of Hell assumes the existence of absolutes. Good, bad - and a god who cares.",
+	["Sir DaimeneX of Laslea"] = "%c[255,72,155,232]Arc: %c[default]\\nThe idea of Hell assumes the existence of absolutes. Good, bad - and a god who cares.",
+	["Sharples97"] = "%c[255,72,155,232]Arc: %c[default]\\nI'm happy and I love it here",
+	["Sharples"] = "%c[255,72,155,232]Arc: %c[default]\\nI'm happy and I love it here",
 }
 
 -- regular confirmation messages, subject to the generic message cooldown
@@ -61,6 +67,10 @@ local special_kill_messages = {
     ["Veno"] = "%c[255,72,155,232]Arc: %c[default]\\nIs this foreshadowing?",
 	["PsysuckerFucker"] = "%c[255,72,155,232]Arc: %c[default]\\nHopefully he remebered to delete his browser history.",
 	["PaeleSaint"] = "%c[255,72,155,232]Arc: %c[default]\\nFantic down, gone to the big monolith in the sky...",
+	["DaimeneX"] = "%c[255,72,155,232]Arc: %c[default]\\nI die so that democracy may live.",
+	["Sir DaimeneX of Laslea"] = "%c[255,72,155,232]Arc: %c[default]\\nI die so that democracy may live.",
+	["Sharples97"] = "%c[255,72,155,232]Arc: %c[default]\\nHey, you guys wanna see a dead body?",
+	["Sharples"] = "%c[255,72,155,232]Arc: %c[default]\\nHey, you guys wanna see a dead body?",
 }
 
 -- regular kill messages
@@ -71,11 +81,19 @@ local generic_kill_messages = {
 	"%c[255,72,155,232]Arc: %c[default]\\nSo long, ",
 }
 
---[[
-    ========================
-    CODE (DO NOT EDIT)
-    ========================
-]]--
+--=====================================================
+-- TRANSLATION CACHE
+--=====================================================
+
+local translate_cache = {}
+local function tr(key)
+    local v = translate_cache[key]
+    if v == nil then
+        v = game.translate_string(key)
+        translate_cache[key] = v
+    end
+    return v
+end
 
 --=====================================================
 -- TIME HELPERS
@@ -95,12 +113,12 @@ end
 
 -- "just now" / "5h ago" / "3d ago"
 local function time_ago(tb)
-    if not tb then return game.translate_string("ui_anr_tracker_never") end
+    if not tb then return tr("ui_anr_tracker_never") end
     local secs = game.get_game_time():diffSec(ctime_from_table(tb))
     local hours = math.floor(secs / 3600)
-    if hours < 1 then return game.translate_string("ui_anr_tracker_just_now") end
-    if hours < 24 then return hours .. "h " .. game.translate_string("ui_anr_tracker_ago") end
-    return math.floor(hours / 24) .. "d " .. game.translate_string("ui_anr_tracker_ago")
+    if hours < 1 then return tr("ui_anr_tracker_just_now") end
+    if hours < 24 then return hours .. "h " .. tr("ui_anr_tracker_ago") end
+    return math.floor(hours / 24) .. "d " .. tr("ui_anr_tracker_ago")
 end
 
 local function seconds_since(tb)
@@ -148,8 +166,8 @@ local function level_display_name(id)
     if not id then return "?" end
     if LEVEL_NAMES[id] then return LEVEL_NAMES[id] end
     -- unknown map: try the game's own string table, else show the raw id
-    local tr = game.translate_string(id)
-    if tr and tr ~= "" and tr ~= id then return tr end
+    local t = tr(id)
+    if t and t ~= "" and t ~= id then return t end
     return id
 end
 
@@ -303,6 +321,12 @@ local generic_patterns = {
     "sim_npc", "alpha", "weak", "normal", "strong"
 }
 
+local filter_factions = {
+    "stalker", "bandit", "dolg", "freedom", "csky", "ecolog",
+    "killer", "army", "monolith", "renegade", "greh", "isg", "zombied",
+}
+
+
 -- load names
 local function sync_names()
     local engine_root_path = getFS():update_path("$fs_root$", "")
@@ -365,6 +389,16 @@ local function is_generic_profile(profile)
     return false
 end
 
+
+-- checks for faction and if faction is allowed
+local faction_allowed = {}
+
+local function is_faction_allowed(community)
+    if not community or community == "" then return true end
+    return faction_allowed[community] ~= false
+end
+
+
 -- grabs a random name from the pool and removes it
 local function take_random_name()
     local idx = math.random(#donator_pool)
@@ -373,9 +407,64 @@ local function take_random_name()
     assigned_names[chosen_name] = true
     return chosen_name
 end
+local function initial_spawn()
+    if initial_spawn_done then return end
+    initial_spawn_done = true -- set first so a mid-spawn error can't make it repeat
+
+    if not (file_found and #donator_pool > 0) then
+        printf("ANR: initial spawn skipped, no names available.")
+        return
+    end
+
+    local checked, renamed = 0, 0
+    for id = 1, 65534 do
+        if #donator_pool == 0 then break end
+
+        local se_obj = alife_object(id)
+        if se_obj then
+            local ok_s, is_stalker = pcall(IsStalker, se_obj)
+            if ok_s and is_stalker then
+                local ok_a, alive = pcall(se_obj.alive, se_obj)
+                local obj_name = se_obj:name()
+
+                if ok_a and alive and not processed_npcs[obj_name] and not renamed_npcs[obj_name] then
+                    -- profile_name if the server object has it, else fall back to section name
+                    local ok_p, profile = pcall(se_obj.profile_name, se_obj)
+                    if not (ok_p and profile and profile ~= "") then
+                        ok_p, profile = pcall(se_obj.section_name, se_obj)
+                    end
+
+                    if ok_p and profile and is_generic_profile(profile) then
+                        local ok_c, community = pcall(se_obj.character_community, se_obj)
+                        if not (ok_c and community and community ~= "") then
+                            ok_c, community = pcall(se_obj.community, se_obj)
+                        end
+
+                        if not is_faction_allowed(ok_c and community or nil) then
+                            processed_npcs[obj_name] = true
+                        else
+                            checked = checked + 1
+                            processed_npcs[obj_name] = true
+
+                            if math.random() * 100 <= initial_spawn_chance then
+                                local chosen_name = take_random_name()
+                                se_obj:set_character_name(chosen_name)
+                                renamed_npcs[obj_name] = { id = id, chosen_name = chosen_name, marker_added = false }
+                                renamed = renamed + 1
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    printf("ANR: initial spawn done. Rolled " .. checked .. " stalker(s), renamed " .. renamed .. ", pool size now " .. #donator_pool)
+end
 
 local function actor_on_first_update()
     sync_names()
+	initial_spawn()
 end
 
 --=====================================================
@@ -383,35 +472,45 @@ end
 --=====================================================
 
 function on_mcm_load()
+    local banner = function(id, text_key)
+        return { id = id, type = "slide", link = "ui_options_slider_player", text = text_key, size = {512, 50}, spacing = 20 }
+    end
+
     op = {
         id = "arc_name_replacer",
         sh = true,
         gr = {
-            -- Title text banner mapping
-            { id = "title", type = "slide", link = "ui_options_slider_player", text = "ui_mcm_arc_name_replacer_title", size = {512, 50}, spacing = 20 },
-
-            -- Spawn Chance Slider (0% to 100%)
-            { id = "spawn_chance", type = "track", val = 2, def = 1, min = 0, max = 100, step = 0.5 },
-
-            -- PDA Notification Checkbox Toggle
-            { id = "enable_messages", type = "check", val = 1, def = true },
-
-            -- Death Notification Checkbox Toggle
-            { id = "enable_death_messages", type = "check", val = 1, def = true },
-
-            -- Generic Message Cooldown Slider (seconds)
-            { id = "generic_message_cooldown", type = "track", val = 2, def = 1, min = 0, max = 60, step = 1 },
-
-            -- Debug Info Checkbox Toggle
-            { id = "debug_enabled", type = "check", val = 1, def = false },
-
-            -- Map Marker Checkbox Toggle
-            { id = "enable_map_markers", type = "check", val = 1, def = true },
 			
-			-- Name Reset button
-			{ id = "reset_name_pool", type = "check", val = 1, def = false }
+            -- Spawning
+            banner("hdr_spawn", "ui_mcm_arc_name_replacer_header_spawn"),
+            { id = "spawn_chance",         type = "track", val = 2, def = 1, min = 0, max = 100, step = 0.5 },
+            { id = "initial_spawn_chance", type = "track", val = 2, def = 1, min = 0, max = 100, step = 0.5 },
+            
+			
+            -- Notifications & map markers
+            banner("hdr_notify", "ui_mcm_arc_name_replacer_header_notify"),
+            { id = "enable_messages",           type = "check", val = 1, def = true },
+            { id = "enable_death_messages",     type = "check", val = 1, def = true },
+            { id = "generic_message_cooldown",  type = "track", val = 2, def = 1, min = 0, max = 60, step = 1 },
+            { id = "enable_map_markers",        type = "check", val = 1, def = true },
+			
+            -- Factions
+            banner("faction", "ui_mcm_arc_name_replacer_faction_title"),
         }
     }
+
+
+	
+    -- Faction filters
+    for _, f in ipairs(filter_factions) do
+        table.insert(op.gr, { id = "allow_" .. f, type = "check", val = 1, def = true })
+    end
+
+    -- Debug (bottom)
+    table.insert(op.gr, banner("hdr_debug", "ui_mcm_arc_name_replacer_header_debug"))
+    table.insert(op.gr, { id = "debug_enabled", type = "check", val = 1, def = false })
+	table.insert(op.gr, { id = "reset_name_pool",      type = "check", val = 1, def = false })
+
     return op
 end
 
@@ -419,11 +518,16 @@ function load_settings()
     if ui_mcm then
         spawn_chance = ui_mcm.get("arc_name_replacer/spawn_chance")
         enable_messages = ui_mcm.get("arc_name_replacer/enable_messages")
-        enable_death_messages = ui_mcm.get("arc_name_replacer/enable_death_messages")
+        enable_death_messages = ui_mcm.get("arc_name_replacer/enable_death_messages") -- was missing, checkbox did nothing without this
         generic_message_cooldown = ui_mcm.get("arc_name_replacer/generic_message_cooldown")
         debug_enabled = ui_mcm.get("arc_name_replacer/debug_enabled")
         enable_map_markers = ui_mcm.get("arc_name_replacer/enable_map_markers")
-        reset_flag_now = ui_mcm.get("arc_name_replacer/reset_name_pool")
+        reset_flag_now = ui_mcm.get("arc_name_replacer/reset_name_pool") and true or false
+		initial_spawn_chance = ui_mcm.get("arc_name_replacer/initial_spawn_chance")
+		for _, f in ipairs(filter_factions) do
+            local v = ui_mcm.get("arc_name_replacer/allow_" .. f)
+            faction_allowed[f] = (v ~= false) -- nil (not loaded yet) counts as allowed
+        end
     end
 end
 
@@ -440,6 +544,8 @@ local function save_state(m_data)
     m_data.ANR_names_loaded = file_found
     m_data.ANR_last_generic_message_time = last_generic_message_time
 	m_data.ANR_known_names = known_names
+	m_data.ANR_initial_spawn_done = initial_spawn_done
+	
 end
 
 local function load_state(m_data)
@@ -451,6 +557,11 @@ local function load_state(m_data)
     file_found = m_data.ANR_names_loaded or file_found
     last_generic_message_time = m_data.ANR_last_generic_message_time or last_generic_message_time
 	known_names = m_data.ANR_known_names
+	if m_data.ANR_initial_spawn_done ~= nil then
+        initial_spawn_done = m_data.ANR_initial_spawn_done
+    else
+        initial_spawn_done = true
+    end
 end
 
 --=====================================================
@@ -489,7 +600,7 @@ local function try_rename_npc(npc)
         printf("ANR: Protected Unique NPC found (" .. profile .. "). Skipping donator rename roll.")
         return
     end
-	
+	if not is_faction_allowed(npc:character_community()) then return end
     if not (file_found and #donator_pool ~= 0) then return end
 	
     local roll = math.random() * 100
@@ -687,26 +798,28 @@ local STATUS_SORT_RANK = {
     dead = 3,
 }
 
+-- Cheap pass: builds a light row per tracked npc with only what's needed to
+-- sort. Display text is built per-row, on demand, by finalize_tracker_row().
+-- refresh_status (alife_object lookup) only runs here when sorting by status,
+-- otherwise it runs lazily for the rows that are actually displayed.
+-- seen_secs is only computed when sorting by "seen".
 function get_tracker_rows(sort_key, ascending)
     sort_key = sort_key or "name"
     if ascending == nil then ascending = true end
 
+    local need_status = (sort_key == "status")
+    local need_seen = (sort_key == "seen")
+
     local rows = {}
     for id, e in pairs(tracked_npcs) do
-        refresh_status(id, e)
-        table.insert(rows, {
+        if need_status then refresh_status(id, e) end
+        rows[#rows + 1] = {
+            id = id,
+            entry = e,
             name = e.name or "?",
-            icon = e.icon,
-            community = e.community,
-            faction_text = e.community and game.translate_string(e.community) or "",
             status = e.status or "alive", -- raw key, for sorting
-            status_text = game.translate_string(STATUS_KEYS[e.status] or "ui_anr_tracker_alive"),
-            rank_text = e.rank and game.translate_string(e.rank) or "",
-            color = STATUS_COLORS[e.status] or STATUS_COLORS.alive,
-            seen_secs = seconds_since(e.last_seen), -- raw value, for sorting
-            seen_text = time_ago(e.last_seen),
-            level_text = e.last_level and level_display_name(e.last_level) or "",
-        })
+            seen_secs = need_seen and seconds_since(e.last_seen) or 0,
+        }
     end
 
     local function by_name(a, b)
@@ -737,6 +850,29 @@ function get_tracker_rows(sort_key, ascending)
 
     return rows
 end
+
+-- Expensive pass: fills in the display fields for ONE row. Called by the tab
+-- only for the rows on the current page. Safe to call repeatedly (cached).
+function finalize_tracker_row(row)
+    if row.ready then return row end
+
+    local e = row.entry
+    refresh_status(row.id, e)
+
+    row.status = e.status or "alive"
+    row.icon = e.icon
+    row.community = e.community
+    row.faction_text = e.community and tr(e.community) or ""
+    row.status_text = tr(STATUS_KEYS[e.status] or "ui_anr_tracker_alive")
+    row.rank_text = e.rank and tr(e.rank) or ""
+    row.color = STATUS_COLORS[e.status] or STATUS_COLORS.alive
+    row.seen_text = time_ago(e.last_seen)
+    row.level_text = e.last_level and level_display_name(e.last_level) or ""
+
+    row.ready = true
+    return row
+end
+
 --=====================================================
 -- Manual Name Reset
 --=====================================================
@@ -802,9 +938,10 @@ local function reset_name_pool()
     file_found = true
 
     printf("ANR: Name pool reset. " .. #donator_pool .. " available, " .. used_count .. " in use, " .. #file_names .. " total in file.")
-    news_manager.send_tip(db.actor, "%c[255,255, 191, 0]ANR DEBUG: %c[default]\\nName pool reset: " .. #donator_pool .. " names available.", nil, "default", 5000)
-	
-	if ui_mcm and ui_mcm.set then
+    news_manager.send_tip(db.actor, "%c[255,72,155,232]Arc: %c[default]\\nName pool reset: " .. #donator_pool .. " names available.", nil, "default", 5000)
+
+    -- untick the checkbox so it acts like a button
+    if ui_mcm and ui_mcm.set then
         ui_mcm.set("arc_name_replacer/reset_name_pool", false)
     end
     reset_flag_now = false

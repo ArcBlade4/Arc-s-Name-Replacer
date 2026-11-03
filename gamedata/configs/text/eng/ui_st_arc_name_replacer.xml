@@ -6,6 +6,10 @@
     <string id="ui_mcm_arc_name_replacer_title">
         <text>Settings</text>
     </string>
+	
+	<string id="ui_mcm_arc_name_replacer_faction_title">
+        <text>Factions</text>
+    </string>
     
     <!-- Slider Labels -->
     <string id="ui_mcm_arc_name_replacer_spawn_chance">
@@ -20,6 +24,12 @@
     </string>
     <string id="ui_mcm_arc_name_replacer_generic_message_cooldown_desc">
         <text>Minimum time between generic PDA alerts. Special named stalkers always notify regardless of this cooldown.</text>
+    </string>
+	<string id="ui_mcm_arc_name_replacer_initial_spawn_chance">
+        <text>New Game spawn Chance (%)</text>
+    </string>
+    <string id="ui_mcm_arc_name_replacer_initial_spawn_chance_desc">
+        <text>On a new game, every stalker in the world (all maps) gets one roll at this chance to receive a special name. Separate from the regular spawn chance. Only applies at the start of a new game.</text>
     </string>
 
     
@@ -98,4 +108,40 @@
 		<text>Refresh</text>
 	</string>
 
+
+
+	<!-- Faction Filters -->
+	<string id="ui_mcm_arc_name_replacer_allow_stalker"><text>Allow: Loners</text></string>
+    <string id="ui_mcm_arc_name_replacer_allow_stalker_desc"><text>If unticked, Loner stalkers will never receive a special name.</text></string>
+    <string id="ui_mcm_arc_name_replacer_allow_bandit"><text>Allow: Bandits</text></string>
+    <string id="ui_mcm_arc_name_replacer_allow_bandit_desc"><text>If unticked, Bandits will never receive a special name.</text></string>
+    <string id="ui_mcm_arc_name_replacer_allow_dolg"><text>Allow: Duty</text></string>
+    <string id="ui_mcm_arc_name_replacer_allow_dolg_desc"><text>If unticked, Duty members will never receive a special name.</text></string>
+    <string id="ui_mcm_arc_name_replacer_allow_freedom"><text>Allow: Freedom</text></string>
+    <string id="ui_mcm_arc_name_replacer_allow_freedom_desc"><text>If unticked, Freedom members will never receive a special name.</text></string>
+    <string id="ui_mcm_arc_name_replacer_allow_csky"><text>Allow: Clear Sky</text></string>
+    <string id="ui_mcm_arc_name_replacer_allow_csky_desc"><text>If unticked, Clear Sky members will never receive a special name.</text></string>
+    <string id="ui_mcm_arc_name_replacer_allow_ecolog"><text>Allow: Ecologists</text></string>
+    <string id="ui_mcm_arc_name_replacer_allow_ecolog_desc"><text>If unticked, Ecologists will never receive a special name.</text></string>
+    <string id="ui_mcm_arc_name_replacer_allow_killer"><text>Allow: Mercenaries</text></string>
+    <string id="ui_mcm_arc_name_replacer_allow_killer_desc"><text>If unticked, Mercenaries will never receive a special name.</text></string>
+    <string id="ui_mcm_arc_name_replacer_allow_army"><text>Allow: Military</text></string>
+    <string id="ui_mcm_arc_name_replacer_allow_army_desc"><text>If unticked, Military will never receive a special name.</text></string>
+    <string id="ui_mcm_arc_name_replacer_allow_monolith"><text>Allow: Monolith</text></string>
+    <string id="ui_mcm_arc_name_replacer_allow_monolith_desc"><text>If unticked, Monolith members will never receive a special name.</text></string>
+    <string id="ui_mcm_arc_name_replacer_allow_renegade"><text>Allow: Renegades</text></string>
+    <string id="ui_mcm_arc_name_replacer_allow_renegade_desc"><text>If unticked, Renegades will never receive a special name.</text></string>
+    <string id="ui_mcm_arc_name_replacer_allow_greh"><text>Allow: Sin</text></string>
+    <string id="ui_mcm_arc_name_replacer_allow_greh_desc"><text>If unticked, Sin members will never receive a special name.</text></string>
+    <string id="ui_mcm_arc_name_replacer_allow_isg"><text>Allow: ISG</text></string>
+    <string id="ui_mcm_arc_name_replacer_allow_isg_desc"><text>If unticked, ISG members will never receive a special name.</text></string>
+    <string id="ui_mcm_arc_name_replacer_allow_zombied"><text>Allow: Zombied</text></string>
+    <string id="ui_mcm_arc_name_replacer_allow_zombied_desc"><text>If unticked, Zombied stalkers will never receive a special name.</text></string>
+	
+	
+	<!-- Banners -->
+	<string id="ui_mcm_arc_name_replacer_header_spawn"><text>Spawning</text></string>
+	<string id="ui_mcm_arc_name_replacer_header_notify"><text>Notifications &amp; Map Markers</text></string>
+	<string id="ui_mcm_arc_name_replacer_faction_title"><text>Faction Selection</text></string>
+	<string id="ui_mcm_arc_name_replacer_header_debug"><text>Debug</text></string>
 </string_table>

@@ -10,6 +10,12 @@ local LAYOUT = {
     ICON     = 48,   -- portrait size (square)
 }
 
+-- only this many rows are ever built as widgets at once
+local PAGE_SIZE = 9
+-- how often the underlying data is re-fetched while the tab is open
+local DATA_REFRESH_MS = 5000
+local SEARCH_DEBOUNCE_MS = 200
+
 
 local ANR_exc_key_btns = {
     [DIK_keys.DIK_LSHIFT] = true,
@@ -80,7 +86,6 @@ function anr_tracker_row:__init(row)
         self.patch = xml:InitStatic("row_patch", self)
         self.patch:InitTexture(patch_tex)
         self.patch:SetStretchTexture(true)
-        printf("ANR tab: patch applied name=%s community=%s texture=%s", tostring(row.name), tostring(row.community), patch_tex)
     end
 
     self.name = xml:InitTextWnd("row_name", self)
@@ -123,9 +128,11 @@ class "pda_anr_tracker_tab" (CUIScriptWnd)
 
 function pda_anr_tracker_tab:__init()
     super()
-    self._last_update = nil
     self._pending_search = false
     self._search_changed_at = nil
+    self._rows = nil       -- cached, sorted row list from the data script
+    self._rows_at = 0      -- time_global() of the last data fetch
+    self.page = 1
     self.sort_key = "name" -- "name" | "status" | "seen"
     self.sort_ascending = true
     self.search_text = ""
@@ -146,18 +153,18 @@ function pda_anr_tracker_tab:InitControls()
     self.search_lock_btn = xml:Init3tButton("search_lock_btn", self.frame)
     self:Register(self.search_lock_btn, "search_lock_btn")
     self:AddCallback("search_lock_btn", ui_events.BUTTON_CLICKED, self.OnClickSearchLock, self)
-	
-	self.recover_btn = xml:Init3tButton("recover_btn", self.frame)
-    self:Register(self.recover_btn, "recover_btn")
-    self:AddCallback("recover_btn", ui_events.BUTTON_CLICKED, self.OnClickRecover, self)
 
+
+    self.btn_refresh = xml:Init3tButton("btn_refresh", self.frame)
+    self:Register(self.btn_refresh, "btn_refresh")
+    self:AddCallback("btn_refresh", ui_events.BUTTON_CLICKED, self.OnClickRefresh, self)
 
     attach_outline(self.frame, 390, 10, 210, 24, SEARCH_OUTLINE_COLOR)
 
- 
+
     self.search_placeholder = xml:InitTextWnd("search_placeholder", self.frame)
 
- 
+
     self.header_name = xml:Init3tButton("header_name", self.frame)
     self:Register(self.header_name, "header_name")
     self:AddCallback("header_name", ui_events.BUTTON_CLICKED, self.OnHeaderName, self)
@@ -176,7 +183,19 @@ function pda_anr_tracker_tab:InitControls()
     self.empty_text = xml:InitTextWnd("empty_text", self.frame)
     self.empty_text:Show(false)
 
+    -- paging controls
+    self.page_text = xml:InitTextWnd("page_text", self.frame)
+
+    self.btn_prev = xml:Init3tButton("btn_prev", self.frame)
+    self:Register(self.btn_prev, "btn_prev")
+    self:AddCallback("btn_prev", ui_events.BUTTON_CLICKED, self.OnClickPrev, self)
+
+    self.btn_next = xml:Init3tButton("btn_next", self.frame)
+    self:Register(self.btn_next, "btn_next")
+    self:AddCallback("btn_next", ui_events.BUTTON_CLICKED, self.OnClickNext, self)
+
     self:RefreshHeaderLabels()
+    self:Populate(true)
 end
 
 function pda_anr_tracker_tab:RefreshHeaderLabels()
@@ -194,7 +213,8 @@ function pda_anr_tracker_tab:SetSort(sort_key)
         self.sort_ascending = true
     end
     self:RefreshHeaderLabels()
-    self:Populate()
+    self.page = 1
+    self:Populate(true)
 end
 
 function pda_anr_tracker_tab:OnHeaderName()
@@ -207,6 +227,28 @@ end
 
 function pda_anr_tracker_tab:OnHeaderSeen()
     self:SetSort("seen")
+end
+
+function pda_anr_tracker_tab:OnClickRefresh()
+    self:DisarmSearch() -- make sure the search box isn't holding input
+    -- full world scan: adds every renamed stalker to the tracker, including
+    -- ones the player never saw. Heavy (loops every server object), so it only
+    -- runs on this button, never on the periodic refresh.
+    local ok, err = pcall(arc_name_replacer_mcm.manual_recovery)
+    if not ok then
+        printf("ANR: manual recovery failed: %s", tostring(err))
+    end
+    self:Populate(true)
+end
+
+function pda_anr_tracker_tab:OnClickPrev()
+    self.page = self.page - 1
+    self:Populate(false)
+end
+
+function pda_anr_tracker_tab:OnClickNext()
+    self.page = self.page + 1
+    self:Populate(false)
 end
 
 --=====================================================
@@ -234,8 +276,6 @@ function pda_anr_tracker_tab:OnClickSearchLock()
         self:ArmSearch()
     end
 end
-
-
 
 local function anr_block_input()
     CreateTimeEvent("anr_delay_input_unlock", "anr_delay_input_unlock", 0.01, function()
@@ -316,35 +356,52 @@ function on_game_start()
     RegisterScriptCallback("actor_on_update", anr_on_update)
 end
 
-function pda_anr_tracker_tab:Populate()
-    self.list:RemoveAll()
+-- refetch = true re-pulls + re-sorts the data from the data script.
+-- refetch = false reuses the cached rows (paging, search filtering).
+-- Only the rows on the current page are turned into widgets, and only
+-- those rows get their display text built (finalize_tracker_row).
+function pda_anr_tracker_tab:Populate(refetch)
+    if refetch or not self._rows then
+        self._rows = arc_name_replacer_mcm.get_tracker_rows(self.sort_key, self.sort_ascending)
+        self._rows_at = time_global()
+    end
 
-    local rows = arc_name_replacer_mcm.get_tracker_rows(self.sort_key, self.sort_ascending)
+    local rows = self._rows
 
     if self.search_text ~= "" then
         local needle = self.search_text:lower()
         local filtered = {}
         for _, row in ipairs(rows) do
             if row.name:lower():find(needle, 1, true) then
-                table.insert(filtered, row)
+                filtered[#filtered + 1] = row
             end
         end
         rows = filtered
     end
 
-    self.empty_text:Show(#rows == 0)
+    local total = #rows
+    local pages = math.max(1, math.ceil(total / PAGE_SIZE))
+    if self.page > pages then self.page = pages end
+    if self.page < 1 then self.page = 1 end
 
-    for _, row in ipairs(rows) do
+    self.list:RemoveAll()
+    self.empty_text:Show(total == 0)
+
+    local first = (self.page - 1) * PAGE_SIZE + 1
+    local last = math.min(total, first + PAGE_SIZE - 1)
+    for i = first, last do
+        local row = arc_name_replacer_mcm.finalize_tracker_row(rows[i])
         self.list:AddExistingItem(anr_tracker_row(row))
     end
+
+    self.page_text:SetText(self.page .. " / " .. pages)
+    self.btn_prev:Enable(self.page > 1)
+    self.btn_next:Enable(self.page < pages)
 end
-
-
-local SEARCH_DEBOUNCE_MS = 200
 
 function pda_anr_tracker_tab:Update()
     CUIScriptWnd.Update(self)
-	
+
     local current_search = self.search_box:GetText() or ""
 
     self.search_placeholder:Show(current_search == "")
@@ -362,30 +419,17 @@ function pda_anr_tracker_tab:Update()
     if self._pending_search then
         if now - self._search_changed_at > SEARCH_DEBOUNCE_MS then
             self._pending_search = false
-            self:Populate()
-            self._last_update = now
+            self.page = 1
+            self:Populate(false)
         end
         return
     end
 
-    if (not self._last_update) or (now - self._last_update > 500) then
-        self:Populate()
+    -- periodic data refresh (cheap now: only PAGE_SIZE rows get built)
+    if now - self._rows_at > DATA_REFRESH_MS then
+        self:Populate(true)
     end
-    self._last_update = now
 end
-
---=====================================================
--- Refresh Button
---=====================================================
-
-function pda_anr_tracker_tab:OnClickRecover()
-    self:DisarmSearch() -- make sure the search box isn't holding input
-    local added = arc_name_replacer_mcm.manual_recovery()
-    printf("ANR tab: manual recovery added %s stalker(s)", tostring(added))
-    self:Populate()
-end
-
-
 
 --=====================================================
 -- Singleton access

@@ -1,6 +1,6 @@
 <w>
 	
-	<frame_main x="50" y="90" width="820" height="560"/>
+	<frame_main x="50" y="90" width="820" height="650"/>
 
 	<title x="20" y="10" width="780" height="24">
 		<text font="letterica18" align="l" r="230" g="230" b="230">ui_anr_tracker_title</text>
@@ -14,15 +14,15 @@
 		<text font="letterica16" align="l" vert_align="c" r="140" g="140" b="140">Search...</text>
 	</search_placeholder>
 
+	<btn_refresh x="290" y="7" width="90" height="28" check_mode="0">
+		<text font="letterica16">Refresh</text>
+		<texture>ui_inter_pda_btn</texture>
+	</btn_refresh>
+
 	<search_lock_btn x="610" y="7" width="90" height="28" check_mode="0">
 		<text font="letterica16">ui_anr_tracker_lock_btn</text>
 		<texture>ui_inter_pda_btn</texture>
 	</search_lock_btn>
-	
-		<recover_btn x="290" y="7" width="90" height="28" check_mode="0">
-		<text font="letterica16">ui_anr_tracker_recover_btn</text>
-		<texture>ui_inter_pda_btn</texture>
-	</recover_btn>
 
 
 	<header_name x="82" y="44" width="230" height="20">
@@ -35,7 +35,7 @@
 		<text font="letterica16" align="l" r="150" g="150" b="150">ui_anr_tracker_col_seen</text>
 	</header_seen>
 
-	<tracker_list x="20" y="70" width="780" height="480" item_height="58" always_show_scroll="0" can_select_last_item="0" left_ident="0" right_ident="0" top_indent="0" bottom_indent="0" vert_interval="0"/>
+	<tracker_list x="20" y="70" width="780" height="526" item_height="58" always_show_scroll="0" can_select_last_item="0" left_ident="0" right_ident="0" top_indent="0" bottom_indent="0" vert_interval="0"/>
 
 	<empty_text x="20" y="80" width="780" height="24">
 		<text font="letterica16" align="l" r="200" g="200" b="200">ui_anr_tracker_empty</text>
@@ -64,4 +64,16 @@
 	<row_level x="470" y="30" width="300" height="18">
 		<text font="letterica16" align="l" vert_align="c" r="140" g="140" b="140"/>
 	</row_level>
+
+	<btn_prev x="300" y="608" width="60" height="28" check_mode="0">
+		<text font="letterica16">&lt;</text>
+		<texture>ui_inter_pda_btn</texture>
+	</btn_prev>
+	<page_text x="370" y="608" width="80" height="28">
+		<text font="letterica16" align="c" vert_align="c" r="220" g="220" b="220"/>
+	</page_text>
+	<btn_next x="460" y="608" width="60" height="28" check_mode="0">
+		<text font="letterica16">&gt;</text>
+		<texture>ui_inter_pda_btn</texture>
+	</btn_next>
 </w>
