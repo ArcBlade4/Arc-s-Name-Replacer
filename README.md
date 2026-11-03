@@ -43,7 +43,7 @@ Reset name pool: (bool)(default: false) - Rebuilds the name pool from names.txt,
 
 ## Changelog:
 
-v2.0.0: Added new game sweep that rolls every stalker in the world, added faction filters, tracker UI overhaul settings menu reorganised with section headers
+v2.0.0: Added new game sweep that rolls every stalker in the world, added faction filters, tracker UI overhaul, settings menu reorganised with section headers
 
 v1.9.5: Added way to manually refresh names pool
 
