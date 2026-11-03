@@ -1,14 +1,14 @@
 # Arc's Name Replacer
-Arc' Name Replacer Version: 1.9.5
+Arc's Name Replacer Version: 2.0.0
 
-## Mod Description: 
+## Mod Description:
 
-This mod randomly selects non unique stalkers to give a special name taken from the names.txt file.
+This mod randomly selects non unique stalkers to give a special name taken from the names.txt file. Renamed stalkers can be found on the map and followed in a PDA tracker tab.
 
 ## Requirements
-MAC (Mod app creator) https://www.moddb.com/mods/stalker-anomaly/addons/mod-app-creator-mac - required for tracker
+MAC (Mod app creator) https://www.moddb.com/mods/stalker-anomaly/addons/mod-app-creator-mac - required for tracker (optional)
 
-## Installation: 
+## Installation:
 ### Mo2:
 1. Install MAC
 2. Use Mo2 to install Arc's Name Replacer.7z (Load after MAC)
@@ -21,10 +21,11 @@ MAC (Mod app creator) https://www.moddb.com/mods/stalker-anomaly/addons/mod-app-
 3. Place names.txt in the root directory (the same place where AnomalyLauncher.exe is)
 4. Run the game
 
-
 ## MCM settings:
 
 Spawn Chance (float 0-100)(default: 1) - Percentage chance for a stalker to be renamed.
+
+New Game Spawn Chance (float 0-100)(default: 1) - On a new game, every stalker in the world (all maps) gets one roll at this chance to receive a special name. Separate from the regular spawn chance. Only applies at the start of a new game.
 
 Enable PDA Alerts (bool)(default: true) - Turn on/off PDA alerts for when a stalker is renamed.
 
@@ -32,23 +33,27 @@ Enable Death Alerts (bool)(default: true) - Toggle to turn on/off notifications 
 
 Generic Message Cooldown (float 0-60)(default:2) - Time in seconds between generic PDA alerts. Special named stalkers always notify regardless of this cooldown.
 
-Enable Debug Logging (bool)(default: false) - Prints the remaining names in the pool and the current cooldown status to the log every 10 seconds.
-
 Enable Map Markers (bool)(default: true) - Toggle to show a map marker for renamed stalkers until you meet or kill them.
+
+Faction Selection (bool per faction)(default: all true) - Loners, Bandits, Duty, Freedom, Clear Sky, Ecologists, Mercenaries, Military, Monolith, Renegades, Sin, ISG and Zombied. If unticked, that faction will never receive a special name.
+
+Enable Debug Logging (bool)(default: false) - Prints the remaining names in the pool and the current cooldown status to the log every 10 seconds.
 
 Reset name pool: (bool)(default: false) - Rebuilds the name pool from names.txt, excluding names already used by stalkers in this save. Acts like a button and will reset to false on completion.
 
 ## Changelog:
 
+v2.0.0: Added new game sweep that rolls every stalker in the world, added faction filters, tracker UI overhaul settings menu reorganised with section headers
+
 v1.9.5: Added way to manually refresh names pool
 
 v1.9.4: Changed name pool loading to allow for more names to be added mid save
 
-v1.9.3: Deferred profile recovery to button in tracker and added search bar 
+v1.9.3: Deferred profile recovery to button in tracker and added search bar
 
 v1.9.2: Added function to retrieve pre-1.9 update profiles for tracker
 
-v1.9.1: Changed tracker works to be on LOS instead of interacting 
+v1.9.1: Changed tracker works to be on LOS instead of interacting
 
 v1.9: Added tracker renamed stalkers, tracks last seen pos, status, name and faction
 
@@ -62,7 +67,7 @@ v1.7: Added debugging tools
 
 v1.6: Added cooldown for generic messages
 
-v1.5.1: Added some more special messages 
+v1.5.1: Added some more special messages
 
 v1.5: Fixed issue where npc could be renamed when joining/leaving squad
 
@@ -70,12 +75,8 @@ v1.4: Added death alerts when the player kills a renamed npc
 
 v1.3: Made the mod more efficient
 
-v1.2: Added some more PDA alerts 
+v1.2: Added some more PDA alerts
 
 v1.1: Added saving so that a name can only appear once in a save file
 
 v1: Mod created
-
-
-
-
